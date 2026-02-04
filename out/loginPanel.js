@@ -40,9 +40,14 @@ const vscode = __importStar(require("vscode"));
 const atlassianConfig_1 = require("./atlassianConfig");
 class LoginPanel {
     static async show(context, client, provider) {
-        const panel = vscode.window.createWebviewPanel("atlassianLogin", "Atlassian Login", vscode.ViewColumn.Active, { enableScripts: true });
+        const distRoot = path.join(context.extensionPath, "webview-ui", "dist");
+        const panel = vscode.window.createWebviewPanel("atlassianLogin", "Atlassian Login", vscode.ViewColumn.Active, {
+            enableScripts: true,
+            localResourceRoots: [vscode.Uri.file(context.extensionPath), vscode.Uri.file(distRoot)],
+        });
         const resolvedDevPath = resolveDevPath(context.extensionPath);
         const devServerUrl = normalizeDevServerUrl((0, atlassianConfig_1.getWebviewDevServerUrl)());
+        const distPath = resolveDistPath(distRoot);
         const getState = async () => {
             const defaults = await client.getApiTokenDefaults();
             const envApiConfig = (0, atlassianConfig_1.getApiTokenConfig)();
@@ -56,14 +61,12 @@ class LoginPanel {
         };
         const render = async () => {
             const state = await getState();
-            panel.webview.html = getWebviewHtml(panel.webview, state, resolvedDevPath, devServerUrl);
-            if (devServerUrl) {
-                void panel.webview.postMessage({ type: "init", payload: state });
-            }
+            panel.webview.html = getWebviewHtml(panel.webview, state, resolvedDevPath, devServerUrl, distPath);
+            void panel.webview.postMessage({ type: "init", payload: state });
         };
         await render();
         let devWatcher;
-        if (!devServerUrl && resolvedDevPath && fs.existsSync(resolvedDevPath)) {
+        if (!devServerUrl && !distPath && resolvedDevPath && fs.existsSync(resolvedDevPath)) {
             devWatcher = fs.watch(resolvedDevPath, { persistent: false }, () => {
                 void render();
             });
@@ -114,7 +117,7 @@ class LoginPanel {
     }
 }
 exports.LoginPanel = LoginPanel;
-function getWebviewHtml(webview, state, devPath, devServerUrl) {
+function getWebviewHtml(webview, state, devPath, devServerUrl, distPath) {
     const nonce = String(Date.now());
     const baseUrl = escapeHtml(state.baseUrl);
     const email = escapeHtml(state.email);
@@ -125,6 +128,9 @@ function getWebviewHtml(webview, state, devPath, devServerUrl) {
     const apiStatusClass = state.apiTokenConfigured ? "status-ok" : "status-missing";
     if (devServerUrl) {
         return getDevServerHtml(webview, devServerUrl);
+    }
+    if (distPath) {
+        return getDistHtml(webview, distPath);
     }
     if (devPath && fs.existsSync(devPath)) {
         const template = fs.readFileSync(devPath, "utf8");
@@ -288,11 +294,35 @@ function resolveDevPath(extensionPath) {
     }
     return "";
 }
+function resolveDistPath(distRoot) {
+    const indexPath = path.join(distRoot, "index.html");
+    return fs.existsSync(indexPath) ? indexPath : "";
+}
 function normalizeDevServerUrl(value) {
     if (!value) {
         return "";
     }
     return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+function getDistHtml(webview, indexPath) {
+    const distRoot = path.dirname(indexPath);
+    let html = fs.readFileSync(indexPath, "utf8");
+    html = html.replace(/(src|href)="(\/?assets\/[^"]+)"/g, (_match, attr, assetPath) => {
+        const normalized = assetPath.startsWith("/") ? assetPath.slice(1) : assetPath;
+        const assetUri = webview.asWebviewUri(vscode.Uri.file(path.join(distRoot, normalized)));
+        return `${attr}="${assetUri}"`;
+    });
+    const csp = [
+        "default-src 'none'",
+        `img-src ${webview.cspSource} https: data:`,
+        `style-src ${webview.cspSource} 'unsafe-inline'`,
+        `script-src ${webview.cspSource}`,
+        `font-src ${webview.cspSource} https: data:`,
+    ].join("; ");
+    if (!html.includes("Content-Security-Policy")) {
+        html = html.replace("<head>", `<head><meta http-equiv="Content-Security-Policy" content="${csp}">`);
+    }
+    return html;
 }
 function getDevServerHtml(webview, devServerUrl) {
     const nonce = String(Date.now());

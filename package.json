@@ -32,6 +32,7 @@
     "dev:webview": "vite --config webview-ui/vite.config.ts",
     "dev:webview:https": "bash ./scripts/dev-webview-https.sh",
     "dev:hmr": "bash ./scripts/dev-hmr.sh",
+    "build:webview": "vite build --config webview-ui/vite.config.ts",
     "lint": "oxlint src",
     "lint:fix": "oxlint src --fix",
     "fmt": "oxfmt",
@@ -53,7 +54,7 @@
     "launchd:install": "bash ./scripts/launchd-install.sh",
     "launchd:uninstall": "bash ./scripts/launchd-uninstall.sh",
     "release:tag": "bash -lc 'VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git tag v$VERSION; git push origin v$VERSION'",
-    "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile"
+    "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile && bun run build:webview"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",

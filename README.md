@@ -82,6 +82,13 @@ If you want HTTPS locally (some browsers auto-upgrade), run:
 This generates a self-signed cert in `webview-ui/.certs` and starts Vite at
 `https://localhost:5173`. You may need to trust the cert in Keychain.
 
+### Webview Build (Production)
+
+For Marketplace builds, the extension will load `webview-ui/dist/index.html`.
+You can generate it locally with:
+
+- `bun run build:webview`
+
 ### Extension Host Workflow
 
 Run an Extension Development Host (F5) and keep a watch build running:

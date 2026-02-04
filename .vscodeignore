@@ -7,6 +7,7 @@
 src/**
 scripts/**
 webview-ui/**
+!webview-ui/dist/**
 .vscode/**
 .gitignore
 .vscodeignore

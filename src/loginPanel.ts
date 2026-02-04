@@ -23,15 +23,20 @@ export class LoginPanel {
     client: AtlassianClient,
     provider: AtlassianIssuesProvider,
   ): Promise<void> {
+    const distRoot = path.join(context.extensionPath, "webview-ui", "dist");
     const panel = vscode.window.createWebviewPanel(
       "atlassianLogin",
       "Atlassian Login",
       vscode.ViewColumn.Active,
-      { enableScripts: true },
+      {
+        enableScripts: true,
+        localResourceRoots: [vscode.Uri.file(context.extensionPath), vscode.Uri.file(distRoot)],
+      },
     );
 
     const resolvedDevPath = resolveDevPath(context.extensionPath);
     const devServerUrl = normalizeDevServerUrl(getWebviewDevServerUrl());
+    const distPath = resolveDistPath(distRoot);
 
     const getState = async (): Promise<WebviewState> => {
       const defaults = await client.getApiTokenDefaults();
@@ -49,16 +54,20 @@ export class LoginPanel {
 
     const render = async (): Promise<void> => {
       const state = await getState();
-      panel.webview.html = getWebviewHtml(panel.webview, state, resolvedDevPath, devServerUrl);
-      if (devServerUrl) {
-        void panel.webview.postMessage({ type: "init", payload: state });
-      }
+      panel.webview.html = getWebviewHtml(
+        panel.webview,
+        state,
+        resolvedDevPath,
+        devServerUrl,
+        distPath,
+      );
+      void panel.webview.postMessage({ type: "init", payload: state });
     };
 
     await render();
 
     let devWatcher: fs.FSWatcher | undefined;
-    if (!devServerUrl && resolvedDevPath && fs.existsSync(resolvedDevPath)) {
+    if (!devServerUrl && !distPath && resolvedDevPath && fs.existsSync(resolvedDevPath)) {
       devWatcher = fs.watch(resolvedDevPath, { persistent: false }, () => {
         void render();
       });
@@ -119,6 +128,7 @@ function getWebviewHtml(
   state: WebviewState,
   devPath: string,
   devServerUrl: string,
+  distPath: string,
 ): string {
   const nonce = String(Date.now());
   const baseUrl = escapeHtml(state.baseUrl);
@@ -131,6 +141,10 @@ function getWebviewHtml(
 
   if (devServerUrl) {
     return getDevServerHtml(webview, devServerUrl);
+  }
+
+  if (distPath) {
+    return getDistHtml(webview, distPath);
   }
 
   if (devPath && fs.existsSync(devPath)) {
@@ -300,11 +314,44 @@ function resolveDevPath(extensionPath: string): string {
   return "";
 }
 
+function resolveDistPath(distRoot: string): string {
+  const indexPath = path.join(distRoot, "index.html");
+  return fs.existsSync(indexPath) ? indexPath : "";
+}
+
 function normalizeDevServerUrl(value: string): string {
   if (!value) {
     return "";
   }
   return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+
+function getDistHtml(webview: vscode.Webview, indexPath: string): string {
+  const distRoot = path.dirname(indexPath);
+  let html = fs.readFileSync(indexPath, "utf8");
+
+  html = html.replace(/(src|href)="(\/?assets\/[^"]+)"/g, (_match, attr, assetPath) => {
+    const normalized = assetPath.startsWith("/") ? assetPath.slice(1) : assetPath;
+    const assetUri = webview.asWebviewUri(vscode.Uri.file(path.join(distRoot, normalized)));
+    return `${attr}="${assetUri}"`;
+  });
+
+  const csp = [
+    "default-src 'none'",
+    `img-src ${webview.cspSource} https: data:`,
+    `style-src ${webview.cspSource} 'unsafe-inline'`,
+    `script-src ${webview.cspSource}`,
+    `font-src ${webview.cspSource} https: data:`,
+  ].join("; ");
+
+  if (!html.includes("Content-Security-Policy")) {
+    html = html.replace(
+      "<head>",
+      `<head><meta http-equiv="Content-Security-Policy" content="${csp}">`,
+    );
+  }
+
+  return html;
 }
 
 function getDevServerHtml(webview: vscode.Webview, devServerUrl: string): string {
