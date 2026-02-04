@@ -36,7 +36,7 @@ Shows your open sprint Jira issues in the Explorer view.
 
 ### Environment Overrides
 
-You can supply OAuth settings via `.env.local` (or `.env`) in the workspace root.
+You can supply OAuth settings via `.env.local` (or `.env`) in any workspace folder.
 The extension loads these and will also resolve `${env:VAR}` placeholders in settings.
 
 - `ATLASSIAN_OAUTH_CLIENT_ID`
@@ -68,7 +68,20 @@ The extension loads these and will also resolve `${env:VAR}` placeholders in set
 
 ## Publish
 
-- `bun run publish` publishes the current version using `VSCE_PAT` from `.env.local`.
+- `bun run publish` publishes the current version using `VSCE_PAT` from `.env.local`, then
+  waits for Marketplace propagation and installs the new version locally.
 - `bun run publish:patch` bumps the patch version and publishes.
 - `bun run publish:minor` bumps the minor version and publishes.
 - `bun run publish:major` bumps the major version and publishes.
+- `bun run release:tag` creates and pushes a git tag for the current version.
+- `bun run publish:patch:tag` bumps patch, publishes, then tags the release.
+  This will also install the new Marketplace version locally.
+
+## CI/CD
+
+This repo includes a GitHub Actions workflow at `.github/workflows/release.yml`.
+Push a tag like `v0.0.5` and it will:
+
+- build + package the VSIX
+- publish to the Marketplace (requires `VSCE_PAT` secret)
+- create a GitHub Release and attach the VSIX

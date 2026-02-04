@@ -9,8 +9,6 @@ export interface OAuthConfig {
   redirectPort: number;
 }
 
-let envCache: Record<string, string> | null = null;
-
 export function getOAuthConfig(): OAuthConfig {
   const config = vscode.workspace.getConfiguration("atlassian");
   const env = getEnvMap();
@@ -97,15 +95,11 @@ function resolveEnvPlaceholders(value: string | undefined, env: Record<string, s
 }
 
 function getEnvMap(): Record<string, string> {
-  if (envCache) {
-    return envCache;
-  }
-
   const merged: Record<string, string> = {};
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (workspaceRoot) {
-    const envPath = path.join(workspaceRoot, ".env");
-    const envLocalPath = path.join(workspaceRoot, ".env.local");
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  for (const folder of folders) {
+    const envPath = path.join(folder.uri.fsPath, ".env");
+    const envLocalPath = path.join(folder.uri.fsPath, ".env.local");
     Object.assign(merged, parseEnvFile(envPath));
     Object.assign(merged, parseEnvFile(envLocalPath));
   }
@@ -116,7 +110,6 @@ function getEnvMap(): Record<string, string> {
     }
   }
 
-  envCache = merged;
   return merged;
 }
 
@@ -134,7 +127,8 @@ function parseEnvFile(filePath: string): Record<string, string> {
       continue;
     }
 
-    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    const normalized = trimmed.startsWith("export ") ? trimmed.slice(7).trim() : trimmed;
+    const match = normalized.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
     if (!match) {
       continue;
     }

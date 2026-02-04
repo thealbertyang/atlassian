@@ -1,0 +1,41 @@
+name: Release VS Code Extension
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.9"
+
+      - name: Install deps
+        run: bun install
+
+      - name: Build (tsgo)
+        run: bun run compile
+
+      - name: Package VSIX
+        run: bun run package:extension
+
+      - name: Publish to Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce publish -p "$VSCE_PAT"
+
+      - name: Create GitHub Release + Upload VSIX
+        uses: softprops/action-gh-release@v2
+        with:
+          files: atlassian-sprint-view.vsix

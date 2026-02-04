@@ -37,7 +37,6 @@ exports.getOAuthConfig = getOAuthConfig;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
-let envCache = null;
 function getOAuthConfig() {
     const config = vscode.workspace.getConfiguration("atlassian");
     const env = getEnvMap();
@@ -87,14 +86,11 @@ function resolveEnvPlaceholders(value, env) {
     return value.replace(/\$\{env:([^}]+)\}/g, (_match, name) => env[name] ?? "");
 }
 function getEnvMap() {
-    if (envCache) {
-        return envCache;
-    }
     const merged = {};
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (workspaceRoot) {
-        const envPath = path.join(workspaceRoot, ".env");
-        const envLocalPath = path.join(workspaceRoot, ".env.local");
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    for (const folder of folders) {
+        const envPath = path.join(folder.uri.fsPath, ".env");
+        const envLocalPath = path.join(folder.uri.fsPath, ".env.local");
         Object.assign(merged, parseEnvFile(envPath));
         Object.assign(merged, parseEnvFile(envLocalPath));
     }
@@ -103,7 +99,6 @@ function getEnvMap() {
             merged[key] = value;
         }
     }
-    envCache = merged;
     return merged;
 }
 function parseEnvFile(filePath) {
@@ -117,7 +112,8 @@ function parseEnvFile(filePath) {
         if (!trimmed || trimmed.startsWith("#")) {
             continue;
         }
-        const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+        const normalized = trimmed.startsWith("export ") ? trimmed.slice(7).trim() : trimmed;
+        const match = normalized.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
         if (!match) {
             continue;
         }
