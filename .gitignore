@@ -3,6 +3,9 @@ node_modules/
 atlassian-sprint-view.vsix
 *.log
 .env.local
+webview-ui/dist/
+webview-ui/**/*.js
+webview-ui/**/*.js.map
 
 # macOS
 .DS_Store
