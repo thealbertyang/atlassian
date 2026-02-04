@@ -1,17 +1,17 @@
 {
   "name": "atlassian-sprint-view",
   "displayName": "Atlassian Sprint Issues",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Show your open sprint Jira issues in a Tree View.",
   "categories": [
     "Other"
   ],
-  "publisher": "AlbertYang",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/thealbertyang/atlassian.git"
   },
+  "publisher": "albertyang",
   "main": "./out/extension.js",
   "scripts": {
     "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile",

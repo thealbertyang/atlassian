@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 atlassian-sprint-view.vsix
 *.log
+.env.local
 
 # macOS
 .DS_Store
