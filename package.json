@@ -42,9 +42,9 @@
     "publish:patch": "node ./scripts/bump-version.js patch && bun run publish && bun run release:tag",
     "publish:minor": "node ./scripts/bump-version.js minor && bun run publish && bun run release:tag",
     "publish:major": "node ./scripts/bump-version.js major && bun run publish && bun run release:tag",
-    "release:patch": "bash -lc 'set -e; if [ -n \"$(git status --porcelain)\" ]; then echo \"Working tree not clean\"; exit 1; fi; node ./scripts/bump-version.js patch; bun run lint:fix; bun run fmt; bun run compile; git add package.json out; VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git commit -m \"Release v$VERSION\"; git push; bun run publish; bun run release:tag'",
-    "release:minor": "bash -lc 'set -e; if [ -n \"$(git status --porcelain)\" ]; then echo \"Working tree not clean\"; exit 1; fi; node ./scripts/bump-version.js minor; bun run lint:fix; bun run fmt; bun run compile; git add package.json out; VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git commit -m \"Release v$VERSION\"; git push; bun run publish; bun run release:tag'",
-    "release:major": "bash -lc 'set -e; if [ -n \"$(git status --porcelain)\" ]; then echo \"Working tree not clean\"; exit 1; fi; node ./scripts/bump-version.js major; bun run lint:fix; bun run fmt; bun run compile; git add package.json out; VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git commit -m \"Release v$VERSION\"; git push; bun run publish; bun run release:tag'",
+    "release:patch": "bash ./scripts/release-flow.sh patch",
+    "release:minor": "bash ./scripts/release-flow.sh minor",
+    "release:major": "bash ./scripts/release-flow.sh major",
     "release:tag": "bash -lc 'VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git tag v$VERSION; git push origin v$VERSION'",
     "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile"
   },
