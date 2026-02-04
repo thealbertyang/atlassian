@@ -59,8 +59,10 @@ If you want fast iteration on the login panel UI, set:
 - `ATLASSIAN_WEBVIEW_DEV_PATH` in `.env.local`
 
 Point it to a local HTML file (for example: `.../webview/login.html`). The panel will
-reload whenever that file changes. You still need `Developer: Reload Window` for
-extension host changes (tree view logic, API code).
+reload whenever that file changes. By default, the extension will use
+`webview/login.html` from its install path if present, so editing that file in the
+repo also live-reloads without extra config. You still need `Developer: Reload Window`
+for extension host changes (tree view logic, API code).
 
 ## Commands
 

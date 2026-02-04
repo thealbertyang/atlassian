@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import { AtlassianClient } from "./atlassianClient";
 import { getApiTokenConfig, getOAuthConfig, getWebviewDevPath } from "./atlassianConfig";
@@ -17,27 +18,27 @@ export class LoginPanel {
       { enableScripts: true },
     );
 
+    const resolvedDevPath = resolveDevPath(context.extensionPath);
+
     const render = async (): Promise<void> => {
       const defaults = await client.getApiTokenDefaults();
       const envApiConfig = getApiTokenConfig();
       const oauthConfig = getOAuthConfig();
       const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
-      const devPath = getWebviewDevPath();
       panel.webview.html = getWebviewHtml(
         panel.webview,
         defaults,
         oauthConfigured,
         Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken),
-        devPath,
+        resolvedDevPath,
       );
     };
 
     await render();
 
-    const devPath = getWebviewDevPath();
     let devWatcher: fs.FSWatcher | undefined;
-    if (devPath && fs.existsSync(devPath)) {
-      devWatcher = fs.watch(devPath, { persistent: false }, () => {
+    if (resolvedDevPath && fs.existsSync(resolvedDevPath)) {
+      devWatcher = fs.watch(resolvedDevPath, { persistent: false }, () => {
         void render();
       });
     }
@@ -253,6 +254,20 @@ function getWebviewHtml(
   </script>
 </body>
 </html>`;
+}
+
+function resolveDevPath(extensionPath: string): string {
+  const configured = getWebviewDevPath();
+  if (configured) {
+    return configured;
+  }
+
+  const defaultPath = path.join(extensionPath, "webview", "login.html");
+  if (fs.existsSync(defaultPath)) {
+    return defaultPath;
+  }
+
+  return "";
 }
 
 function renderTemplate(template: string, values: Record<string, string>): string {

@@ -35,24 +35,24 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginPanel = void 0;
 const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const atlassianConfig_1 = require("./atlassianConfig");
 class LoginPanel {
     static async show(context, client, provider) {
         const panel = vscode.window.createWebviewPanel("atlassianLogin", "Atlassian Login", vscode.ViewColumn.Active, { enableScripts: true });
+        const resolvedDevPath = resolveDevPath(context.extensionPath);
         const render = async () => {
             const defaults = await client.getApiTokenDefaults();
             const envApiConfig = (0, atlassianConfig_1.getApiTokenConfig)();
             const oauthConfig = (0, atlassianConfig_1.getOAuthConfig)();
             const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
-            const devPath = (0, atlassianConfig_1.getWebviewDevPath)();
-            panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured, Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken), devPath);
+            panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured, Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken), resolvedDevPath);
         };
         await render();
-        const devPath = (0, atlassianConfig_1.getWebviewDevPath)();
         let devWatcher;
-        if (devPath && fs.existsSync(devPath)) {
-            devWatcher = fs.watch(devPath, { persistent: false }, () => {
+        if (resolvedDevPath && fs.existsSync(resolvedDevPath)) {
+            devWatcher = fs.watch(resolvedDevPath, { persistent: false }, () => {
                 void render();
             });
         }
@@ -256,6 +256,17 @@ function getWebviewHtml(webview, defaults, oauthConfigured, apiTokenConfigured, 
   </script>
 </body>
 </html>`;
+}
+function resolveDevPath(extensionPath) {
+    const configured = (0, atlassianConfig_1.getWebviewDevPath)();
+    if (configured) {
+        return configured;
+    }
+    const defaultPath = path.join(extensionPath, "webview", "login.html");
+    if (fs.existsSync(defaultPath)) {
+        return defaultPath;
+    }
+    return "";
 }
 function renderTemplate(template, values) {
     return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, key) => values[key] ?? "");
