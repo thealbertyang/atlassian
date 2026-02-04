@@ -73,6 +73,15 @@ For a richer UI, you can run a local dev server and have the webview load it:
 
 Then reopen `Atlassian: Login`. The webview will load the dev server and get HMR.
 
+#### HTTPS (optional)
+
+If you want HTTPS locally (some browsers auto-upgrade), run:
+
+- `bun run dev:webview:https`
+
+This generates a self-signed cert in `webview-ui/.certs` and starts Vite at
+`https://localhost:5173`. You may need to trust the cert in Keychain.
+
 ### Extension Host Workflow
 
 Run an Extension Development Host (F5) and keep a watch build running:

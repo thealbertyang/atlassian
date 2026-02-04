@@ -6,6 +6,7 @@ atlassian-sprint-view.vsix
 webview-ui/dist/
 webview-ui/**/*.js
 webview-ui/**/*.js.map
+webview-ui/.certs/
 
 # macOS
 .DS_Store
