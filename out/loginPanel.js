@@ -34,16 +34,28 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginPanel = void 0;
+const fs = __importStar(require("fs"));
 const vscode = __importStar(require("vscode"));
 const atlassianConfig_1 = require("./atlassianConfig");
 class LoginPanel {
     static async show(context, client, provider) {
         const panel = vscode.window.createWebviewPanel("atlassianLogin", "Atlassian Login", vscode.ViewColumn.Active, { enableScripts: true });
-        const defaults = await client.getApiTokenDefaults();
-        const envApiConfig = (0, atlassianConfig_1.getApiTokenConfig)();
-        const oauthConfig = (0, atlassianConfig_1.getOAuthConfig)();
-        const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
-        panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured, Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken));
+        const render = async () => {
+            const defaults = await client.getApiTokenDefaults();
+            const envApiConfig = (0, atlassianConfig_1.getApiTokenConfig)();
+            const oauthConfig = (0, atlassianConfig_1.getOAuthConfig)();
+            const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
+            const devPath = (0, atlassianConfig_1.getWebviewDevPath)();
+            panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured, Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken), devPath);
+        };
+        await render();
+        const devPath = (0, atlassianConfig_1.getWebviewDevPath)();
+        let devWatcher;
+        if (devPath && fs.existsSync(devPath)) {
+            devWatcher = fs.watch(devPath, { persistent: false }, () => {
+                void render();
+            });
+        }
         panel.webview.onDidReceiveMessage(async (message) => {
             try {
                 if (message.type === "error") {
@@ -77,10 +89,15 @@ class LoginPanel {
                 vscode.window.showErrorMessage(messageText);
             }
         });
+        panel.onDidDispose(() => {
+            if (devWatcher) {
+                devWatcher.close();
+            }
+        });
     }
 }
 exports.LoginPanel = LoginPanel;
-function getWebviewHtml(webview, defaults, oauthConfigured, apiTokenConfigured) {
+function getWebviewHtml(webview, defaults, oauthConfigured, apiTokenConfigured, devPath) {
     const nonce = String(Date.now());
     const baseUrl = escapeHtml(defaults.baseUrl);
     const email = escapeHtml(defaults.email);
@@ -89,6 +106,20 @@ function getWebviewHtml(webview, defaults, oauthConfigured, apiTokenConfigured) 
     const oauthDisabled = oauthConfigured ? "" : "disabled";
     const apiStatus = apiTokenConfigured ? "Configured" : "Missing";
     const apiStatusClass = apiTokenConfigured ? "status-ok" : "status-missing";
+    if (devPath && fs.existsSync(devPath)) {
+        const template = fs.readFileSync(devPath, "utf8");
+        return renderTemplate(template, {
+            NONCE: nonce,
+            CSP_SOURCE: webview.cspSource,
+            BASE_URL: baseUrl,
+            EMAIL: email,
+            OAUTH_STATUS: oauthStatus,
+            OAUTH_STATUS_CLASS: oauthStatusClass,
+            OAUTH_DISABLED: oauthDisabled,
+            API_STATUS: apiStatus,
+            API_STATUS_CLASS: apiStatusClass,
+        });
+    }
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -225,6 +256,9 @@ function getWebviewHtml(webview, defaults, oauthConfigured, apiTokenConfigured) 
   </script>
 </body>
 </html>`;
+}
+function renderTemplate(template, values) {
+    return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, key) => values[key] ?? "");
 }
 function escapeHtml(value) {
     return value

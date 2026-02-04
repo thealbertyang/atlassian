@@ -16,6 +16,14 @@ export interface ApiTokenConfig {
   jql: string;
 }
 
+export function getWebviewDevPath(): string {
+  const config = vscode.workspace.getConfiguration("atlassian");
+  const env = getEnvMap();
+  const fromConfig = resolveEnvPlaceholders(String(config.get("webviewDevPath") || ""), env);
+  const fromEnv = getEnvValue(env, "ATLASSIAN_WEBVIEW_DEV_PATH");
+  return (fromConfig || fromEnv).trim();
+}
+
 export function getOAuthConfig(): OAuthConfig {
   const config = vscode.workspace.getConfiguration("atlassian");
   const env = getEnvMap();

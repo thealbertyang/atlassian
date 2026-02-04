@@ -1,6 +1,7 @@
+import * as fs from "fs";
 import * as vscode from "vscode";
 import { AtlassianClient } from "./atlassianClient";
-import { getApiTokenConfig, getOAuthConfig } from "./atlassianConfig";
+import { getApiTokenConfig, getOAuthConfig, getWebviewDevPath } from "./atlassianConfig";
 import { AtlassianIssuesProvider } from "./issueProvider";
 
 export class LoginPanel {
@@ -16,16 +17,30 @@ export class LoginPanel {
       { enableScripts: true },
     );
 
-    const defaults = await client.getApiTokenDefaults();
-    const envApiConfig = getApiTokenConfig();
-    const oauthConfig = getOAuthConfig();
-    const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
-    panel.webview.html = getWebviewHtml(
-      panel.webview,
-      defaults,
-      oauthConfigured,
-      Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken),
-    );
+    const render = async (): Promise<void> => {
+      const defaults = await client.getApiTokenDefaults();
+      const envApiConfig = getApiTokenConfig();
+      const oauthConfig = getOAuthConfig();
+      const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
+      const devPath = getWebviewDevPath();
+      panel.webview.html = getWebviewHtml(
+        panel.webview,
+        defaults,
+        oauthConfigured,
+        Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken),
+        devPath,
+      );
+    };
+
+    await render();
+
+    const devPath = getWebviewDevPath();
+    let devWatcher: fs.FSWatcher | undefined;
+    if (devPath && fs.existsSync(devPath)) {
+      devWatcher = fs.watch(devPath, { persistent: false }, () => {
+        void render();
+      });
+    }
 
     panel.webview.onDidReceiveMessage(async (message) => {
       try {
@@ -62,6 +77,12 @@ export class LoginPanel {
         vscode.window.showErrorMessage(messageText);
       }
     });
+
+    panel.onDidDispose(() => {
+      if (devWatcher) {
+        devWatcher.close();
+      }
+    });
   }
 }
 
@@ -70,6 +91,7 @@ function getWebviewHtml(
   defaults: { baseUrl: string; email: string },
   oauthConfigured: boolean,
   apiTokenConfigured: boolean,
+  devPath: string,
 ): string {
   const nonce = String(Date.now());
   const baseUrl = escapeHtml(defaults.baseUrl);
@@ -79,6 +101,21 @@ function getWebviewHtml(
   const oauthDisabled = oauthConfigured ? "" : "disabled";
   const apiStatus = apiTokenConfigured ? "Configured" : "Missing";
   const apiStatusClass = apiTokenConfigured ? "status-ok" : "status-missing";
+
+  if (devPath && fs.existsSync(devPath)) {
+    const template = fs.readFileSync(devPath, "utf8");
+    return renderTemplate(template, {
+      NONCE: nonce,
+      CSP_SOURCE: webview.cspSource,
+      BASE_URL: baseUrl,
+      EMAIL: email,
+      OAUTH_STATUS: oauthStatus,
+      OAUTH_STATUS_CLASS: oauthStatusClass,
+      OAUTH_DISABLED: oauthDisabled,
+      API_STATUS: apiStatus,
+      API_STATUS_CLASS: apiStatusClass,
+    });
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -216,6 +253,10 @@ function getWebviewHtml(
   </script>
 </body>
 </html>`;
+}
+
+function renderTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, key) => values[key] ?? "");
 }
 
 function escapeHtml(value: string): string {

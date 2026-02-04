@@ -51,6 +51,17 @@ API token settings can also be provided via `.env.local` (or `.env`):
 - `JIRA_API_TOKEN`
 - `JIRA_JQL` (optional override for the JQL query)
 
+### Webview Dev (Live Refresh)
+
+If you want fast iteration on the login panel UI, set:
+
+- `atlassian.webviewDevPath` in settings, or
+- `ATLASSIAN_WEBVIEW_DEV_PATH` in `.env.local`
+
+Point it to a local HTML file (for example: `.../webview/login.html`). The panel will
+reload whenever that file changes. You still need `Developer: Reload Window` for
+extension host changes (tree view logic, API code).
+
 ## Commands
 
 - `Atlassian: Login`

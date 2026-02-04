@@ -33,11 +33,19 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getWebviewDevPath = getWebviewDevPath;
 exports.getOAuthConfig = getOAuthConfig;
 exports.getApiTokenConfig = getApiTokenConfig;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
+function getWebviewDevPath() {
+    const config = vscode.workspace.getConfiguration("atlassian");
+    const env = getEnvMap();
+    const fromConfig = resolveEnvPlaceholders(String(config.get("webviewDevPath") || ""), env);
+    const fromEnv = getEnvValue(env, "ATLASSIAN_WEBVIEW_DEV_PATH");
+    return (fromConfig || fromEnv).trim();
+}
 function getOAuthConfig() {
     const config = vscode.workspace.getConfiguration("atlassian");
     const env = getEnvMap();

@@ -151,6 +151,11 @@
           "type": "number",
           "default": 50,
           "description": "Maximum number of issues to fetch per refresh."
+        },
+        "atlassian.webviewDevPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional local HTML path for live-refresh webview development. Changes to the file will reload the login panel."
         }
       }
     }
