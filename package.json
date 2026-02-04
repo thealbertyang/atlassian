@@ -1,7 +1,7 @@
 {
   "name": "atlassian-sprint-view",
   "displayName": "Atlassian Sprint Issues",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Show your open sprint Jira issues in a Tree View.",
   "categories": [
     "Other"
