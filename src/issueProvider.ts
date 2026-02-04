@@ -16,13 +16,11 @@ export class AtlassianIssuesProvider implements vscode.TreeDataProvider<IssueIte
   }
 
   async getChildren(_element?: IssueItem): Promise<IssueItem[]> {
-    const authenticated = await this.client.isAuthenticated();
-    if (!authenticated) {
-      return [];
-    }
-
     try {
       const issues = await this.client.searchMyOpenSprintIssues();
+      if (issues.length === 0) {
+        return [];
+      }
       return issues.map((issue) => new IssueItem(issue));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";

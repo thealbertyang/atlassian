@@ -49,12 +49,11 @@ class AtlassianIssuesProvider {
         return element;
     }
     async getChildren(_element) {
-        const authenticated = await this.client.isAuthenticated();
-        if (!authenticated) {
-            return [];
-        }
         try {
             const issues = await this.client.searchMyOpenSprintIssues();
+            if (issues.length === 0) {
+                return [];
+            }
             return issues.map((issue) => new IssueItem(issue));
         }
         catch (error) {
