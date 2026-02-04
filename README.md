@@ -82,10 +82,11 @@ API token settings can also be provided via `.env.local` (or `.env`):
 - `bun run publish:minor` bumps minor, publishes, installs from Marketplace, then tags the release.
 - `bun run publish:major` bumps major, publishes, installs from Marketplace, then tags the release.
 - `bun run release:patch` does the full flow: bump patch, lint/format/compile, show recent commits,
-  prompt for a commit message, commit + push, publish + install, then tag. If `gh` is installed,
-  it also shows GitHub Actions status.
+  prompt for a commit message, commit + push, publish + install, then tag. Output is also written
+  to `.release.log`. If `gh` is installed, it shows GitHub Actions status.
 - `bun run release:minor` same as above for minor versions.
 - `bun run release:major` same as above for major versions.
+- `bun run release:status` shows the latest GitHub Actions release status.
 - `bun run release:tag` creates and pushes a git tag for the current version.
 
 ## CI/CD

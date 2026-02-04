@@ -3,6 +3,11 @@ set -euo pipefail
 
 bump_type="${1:-patch}"
 
+log_file=".release.log"
+exec > >(tee -a "${log_file}") 2>&1
+
+echo "Release log: ${log_file}"
+
 echo "==> Step 1/7: Ensure clean working tree"
 if [ -n "$(git status --porcelain)" ]; then
   echo "Working tree not clean. Commit or stash changes before running a release."
