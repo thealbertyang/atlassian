@@ -190,12 +190,12 @@ export class AtlassianClient {
     let headers: Record<string, string> = {};
 
     if (auth.type === "apiToken") {
-      url = `${auth.baseUrl.replace(/\/$/, "")}/rest/api/3/search?${query.toString()}`;
+      url = `${auth.baseUrl.replace(/\/$/, "")}/rest/api/3/search/jql?${query.toString()}`;
       const basic = Buffer.from(`${auth.email}:${auth.apiToken}`).toString("base64");
       headers = { Authorization: `Basic ${basic}` };
     } else {
       const accessToken = await this.getFreshOAuthToken();
-      url = `https://api.atlassian.com/ex/jira/${auth.cloudId}/rest/api/3/search?${query.toString()}`;
+      url = `https://api.atlassian.com/ex/jira/${auth.cloudId}/rest/api/3/search/jql?${query.toString()}`;
       headers = { Authorization: `Bearer ${accessToken}` };
     }
 

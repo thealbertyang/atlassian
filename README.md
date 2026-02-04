@@ -97,6 +97,7 @@ for the new version and installs it as soon as it appears.
 - `bun run launchd:uninstall` removes the LaunchAgent.
 
 Logs are written to `~/Library/Logs/atlassian-sprint-view-marketplace.log`.
+
 - `bun run release:tag` creates and pushes a git tag for the current version.
 
 ## CI/CD
