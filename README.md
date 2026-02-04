@@ -71,12 +71,10 @@ The extension loads these and will also resolve `${env:VAR}` placeholders in set
 - `bun run publish` publishes the current version using `VSCE_PAT` from `.env.local`, then
   waits for Marketplace propagation and installs the new version locally.
   It installs the exact version to avoid downgrades while the CDN propagates.
-- `bun run publish:patch` bumps the patch version and publishes.
-- `bun run publish:minor` bumps the minor version and publishes.
-- `bun run publish:major` bumps the major version and publishes.
+- `bun run publish:patch` bumps patch, publishes, installs from Marketplace, then tags the release.
+- `bun run publish:minor` bumps minor, publishes, installs from Marketplace, then tags the release.
+- `bun run publish:major` bumps major, publishes, installs from Marketplace, then tags the release.
 - `bun run release:tag` creates and pushes a git tag for the current version.
-- `bun run publish:patch:tag` bumps patch, publishes, then tags the release.
-  This will also install the new Marketplace version locally.
 
 ## CI/CD
 
