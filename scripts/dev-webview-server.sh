@@ -11,7 +11,12 @@ max_port="${ATLASSIAN_WEBVIEW_DEV_PORT_MAX:-5190}"
 
 is_free() {
   local port="$1"
-  node -e "const net=require('net');const s=net.createServer();s.once('error',()=>process.exit(1));s.listen(${port},'127.0.0.1',()=>{s.close(()=>process.exit(0));});"
+  if command -v lsof >/dev/null 2>&1; then
+    if lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+      return 1
+    fi
+  fi
+  node -e "const net=require('net');const s=net.createServer();s.once('error',()=>process.exit(1));s.listen(${port},'0.0.0.0',()=>{s.close(()=>process.exit(0));});"
 }
 
 port="${base_port}"
