@@ -75,6 +75,8 @@ extension host changes (tree view logic, API code).
 - `bun run compile`
 - `bun run lint`
 - `bun run fmt`
+- `bun run dev` opens the login panel, sets the webview dev path (if not set),
+  and runs `tsgo --watch`.
 - Press `F5` to launch an Extension Development Host.
 
 ## Install (Code - Insiders)

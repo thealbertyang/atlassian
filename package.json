@@ -28,6 +28,7 @@
   "scripts": {
     "compile": "tsgo -p ./",
     "watch": "tsgo -watch -p ./",
+    "dev": "bash ./scripts/dev-webview.sh",
     "lint": "oxlint src",
     "lint:fix": "oxlint src --fix",
     "fmt": "oxfmt",
