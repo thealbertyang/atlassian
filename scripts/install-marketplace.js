@@ -30,10 +30,11 @@ function getInstalledVersion() {
 (async () => {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      execSync(`code-insiders --install-extension ${targetId} --force`, {
+      execSync(`code-insiders --install-extension ${targetId}@${targetVersion} --force`, {
         stdio: "inherit",
       });
     } catch (error) {
+      void error;
       // Install may fail before Marketplace propagation; keep retrying.
     }
 
