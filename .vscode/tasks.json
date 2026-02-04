@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ext:watch",
+      "type": "shell",
+      "command": "bun run watch",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "webview:dev",
+      "type": "shell",
+      "command": "bun run dev:webview",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "dev:hmr",
+      "dependsOn": ["ext:watch", "webview:dev"],
+      "dependsOrder": "parallel"
+    }
+  ]
+}

@@ -98,6 +98,14 @@ Run an Extension Development Host (F5) and keep a watch build running:
 
 If you want both HMR + watch: `bun run dev:hmr`
 
+### VS Code Tasks (Seamless)
+
+Use the provided launch config:
+
+1. Press `F5` and choose `Run Extension (HMR)`.
+2. It will start `tsgo --watch` and `vite dev` automatically.
+3. Use `Developer: Restart Extension Host` after host code changes.
+
 ## Commands
 
 - `Atlassian: Login`
