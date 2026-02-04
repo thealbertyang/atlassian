@@ -72,6 +72,8 @@ For a richer UI, you can run a local dev server and have the webview load it:
 - `bun run dev:webview`
 
 Then reopen `Atlassian: Login`. The webview will load the dev server and get HMR.
+The dev server auto-picks a free port and writes `.webview-dev-url` so the
+extension can find it.
 
 #### HTTPS (optional)
 

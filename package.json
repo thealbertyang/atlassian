@@ -29,7 +29,7 @@
     "compile": "tsgo -p ./",
     "watch": "tsgo -watch -p ./",
     "dev": "bash ./scripts/dev-webview.sh",
-    "dev:webview": "vite --config webview-ui/vite.config.ts",
+    "dev:webview": "bash ./scripts/dev-webview-server.sh",
     "dev:webview:https": "bash ./scripts/dev-webview-https.sh",
     "dev:hmr": "bash ./scripts/dev-hmr.sh",
     "build:webview": "vite build --config webview-ui/vite.config.ts",

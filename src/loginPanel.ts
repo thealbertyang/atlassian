@@ -35,7 +35,7 @@ export class LoginPanel {
     );
 
     const resolvedDevPath = resolveDevPath(context.extensionPath);
-    const devServerUrl = normalizeDevServerUrl(getWebviewDevServerUrl());
+    const devServerUrl = normalizeDevServerUrl(resolveDevServerUrl(context.extensionPath));
     const distPath = resolveDistPath(distRoot);
 
     const getState = async (): Promise<WebviewState> => {
@@ -309,6 +309,20 @@ function resolveDevPath(extensionPath: string): string {
   const defaultPath = path.join(extensionPath, "webview", "login.html");
   if (fs.existsSync(defaultPath)) {
     return defaultPath;
+  }
+
+  return "";
+}
+
+function resolveDevServerUrl(extensionPath: string): string {
+  const configured = getWebviewDevServerUrl();
+  if (configured) {
+    return configured;
+  }
+
+  const filePath = path.join(extensionPath, ".webview-dev-url");
+  if (fs.existsSync(filePath)) {
+    return fs.readFileSync(filePath, "utf8").trim();
   }
 
   return "";

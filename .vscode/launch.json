@@ -9,9 +9,7 @@
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "dev:hmr",
-      "env": {
-        "ATLASSIAN_WEBVIEW_DEV_SERVER_URL": "http://localhost:5173"
-      }
+      "env": {}
     }
   ]
 }

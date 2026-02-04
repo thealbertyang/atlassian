@@ -17,12 +17,13 @@ if [ ! -f "${cert_path}" ] || [ ! -f "${key_path}" ]; then
     -subj "/CN=localhost"
 fi
 
-export ATLASSIAN_WEBVIEW_DEV_SERVER_URL="${ATLASSIAN_WEBVIEW_DEV_SERVER_URL:-https://localhost:5173}"
-export ATLASSIAN_WEBVIEW_DEV_HTTPS=1
+export ATLASSIAN_WEBVIEW_DEV_PROTOCOL=https
+export ATLASSIAN_WEBVIEW_DEV_HOST=localhost
+export ATLASSIAN_WEBVIEW_DEV_PORT="${ATLASSIAN_WEBVIEW_DEV_PORT:-5173}"
 export ATLASSIAN_WEBVIEW_DEV_CERT="${cert_path}"
 export ATLASSIAN_WEBVIEW_DEV_KEY="${key_path}"
 
-echo "Webview dev server (HTTPS) at ${ATLASSIAN_WEBVIEW_DEV_SERVER_URL}"
+echo "Webview dev server (HTTPS) starting..."
 echo "Note: You may need to trust the cert in your OS keychain."
 
 bun run dev:webview

@@ -46,7 +46,7 @@ class LoginPanel {
             localResourceRoots: [vscode.Uri.file(context.extensionPath), vscode.Uri.file(distRoot)],
         });
         const resolvedDevPath = resolveDevPath(context.extensionPath);
-        const devServerUrl = normalizeDevServerUrl((0, atlassianConfig_1.getWebviewDevServerUrl)());
+        const devServerUrl = normalizeDevServerUrl(resolveDevServerUrl(context.extensionPath));
         const distPath = resolveDistPath(distRoot);
         const getState = async () => {
             const defaults = await client.getApiTokenDefaults();
@@ -291,6 +291,17 @@ function resolveDevPath(extensionPath) {
     const defaultPath = path.join(extensionPath, "webview", "login.html");
     if (fs.existsSync(defaultPath)) {
         return defaultPath;
+    }
+    return "";
+}
+function resolveDevServerUrl(extensionPath) {
+    const configured = (0, atlassianConfig_1.getWebviewDevServerUrl)();
+    if (configured) {
+        return configured;
+    }
+    const filePath = path.join(extensionPath, ".webview-dev-url");
+    if (fs.existsSync(filePath)) {
+        return fs.readFileSync(filePath, "utf8").trim();
     }
     return "";
 }
