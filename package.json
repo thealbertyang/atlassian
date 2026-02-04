@@ -46,6 +46,8 @@
     "release:minor": "bash ./scripts/release-flow.sh minor",
     "release:major": "bash ./scripts/release-flow.sh major",
     "release:status": "bash ./scripts/release-status.sh",
+    "launchd:install": "bash ./scripts/launchd-install.sh",
+    "launchd:uninstall": "bash ./scripts/launchd-uninstall.sh",
     "release:tag": "bash -lc 'VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git tag v$VERSION; git push origin v$VERSION'",
     "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile"
   },

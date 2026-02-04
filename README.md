@@ -87,6 +87,16 @@ API token settings can also be provided via `.env.local` (or `.env`):
 - `bun run release:minor` same as above for minor versions.
 - `bun run release:major` same as above for major versions.
 - `bun run release:status` shows the latest GitHub Actions release status.
+
+### Reliable Marketplace Install (launchd)
+
+If Marketplace propagation is slow, you can install a launchd helper that polls
+for the new version and installs it as soon as it appears.
+
+- `bun run launchd:install` installs a LaunchAgent that checks every 2 minutes.
+- `bun run launchd:uninstall` removes the LaunchAgent.
+
+Logs are written to `~/Library/Logs/atlassian-sprint-view-marketplace.log`.
 - `bun run release:tag` creates and pushes a git tag for the current version.
 
 ## CI/CD
