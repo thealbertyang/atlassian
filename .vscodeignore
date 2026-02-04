@@ -6,6 +6,7 @@
 **/*.ts
 src/**
 scripts/**
+webview-ui/**
 .vscode/**
 .gitignore
 .vscodeignore

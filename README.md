@@ -64,6 +64,24 @@ reload whenever that file changes. By default, the extension will use
 repo also live-reloads without extra config. You still need `Developer: Reload Window`
 for extension host changes (tree view logic, API code).
 
+### Webview Dev (HMR via Vite)
+
+For a richer UI, you can run a local dev server and have the webview load it:
+
+- `ATLASSIAN_WEBVIEW_DEV_SERVER_URL=http://localhost:5173`
+- `bun run dev:webview`
+
+Then reopen `Atlassian: Login`. The webview will load the dev server and get HMR.
+
+### Extension Host Workflow
+
+Run an Extension Development Host (F5) and keep a watch build running:
+
+- `bun run watch` for extension host code
+- `Developer: Restart Extension Host` after changes
+
+If you want both HMR + watch: `bun run dev:hmr`
+
 ## Commands
 
 - `Atlassian: Login`

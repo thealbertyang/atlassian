@@ -42,16 +42,28 @@ class LoginPanel {
     static async show(context, client, provider) {
         const panel = vscode.window.createWebviewPanel("atlassianLogin", "Atlassian Login", vscode.ViewColumn.Active, { enableScripts: true });
         const resolvedDevPath = resolveDevPath(context.extensionPath);
-        const render = async () => {
+        const devServerUrl = normalizeDevServerUrl((0, atlassianConfig_1.getWebviewDevServerUrl)());
+        const getState = async () => {
             const defaults = await client.getApiTokenDefaults();
             const envApiConfig = (0, atlassianConfig_1.getApiTokenConfig)();
             const oauthConfig = (0, atlassianConfig_1.getOAuthConfig)();
-            const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
-            panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured, Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken), resolvedDevPath);
+            return {
+                baseUrl: defaults.baseUrl,
+                email: defaults.email,
+                oauthConfigured: Boolean(oauthConfig.clientId && oauthConfig.clientSecret),
+                apiTokenConfigured: Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken),
+            };
+        };
+        const render = async () => {
+            const state = await getState();
+            panel.webview.html = getWebviewHtml(panel.webview, state, resolvedDevPath, devServerUrl);
+            if (devServerUrl) {
+                void panel.webview.postMessage({ type: "init", payload: state });
+            }
         };
         await render();
         let devWatcher;
-        if (resolvedDevPath && fs.existsSync(resolvedDevPath)) {
+        if (!devServerUrl && resolvedDevPath && fs.existsSync(resolvedDevPath)) {
             devWatcher = fs.watch(resolvedDevPath, { persistent: false }, () => {
                 void render();
             });
@@ -60,6 +72,11 @@ class LoginPanel {
             try {
                 if (message.type === "error") {
                     vscode.window.showErrorMessage(message.message || "Invalid input.");
+                    return;
+                }
+                if (message.type === "ready") {
+                    const state = await getState();
+                    await panel.webview.postMessage({ type: "init", payload: state });
                     return;
                 }
                 if (message.type === "saveApiToken") {
@@ -97,15 +114,18 @@ class LoginPanel {
     }
 }
 exports.LoginPanel = LoginPanel;
-function getWebviewHtml(webview, defaults, oauthConfigured, apiTokenConfigured, devPath) {
+function getWebviewHtml(webview, state, devPath, devServerUrl) {
     const nonce = String(Date.now());
-    const baseUrl = escapeHtml(defaults.baseUrl);
-    const email = escapeHtml(defaults.email);
-    const oauthStatus = oauthConfigured ? "Configured" : "Missing";
-    const oauthStatusClass = oauthConfigured ? "status-ok" : "status-missing";
-    const oauthDisabled = oauthConfigured ? "" : "disabled";
-    const apiStatus = apiTokenConfigured ? "Configured" : "Missing";
-    const apiStatusClass = apiTokenConfigured ? "status-ok" : "status-missing";
+    const baseUrl = escapeHtml(state.baseUrl);
+    const email = escapeHtml(state.email);
+    const oauthStatus = state.oauthConfigured ? "Configured" : "Missing";
+    const oauthStatusClass = state.oauthConfigured ? "status-ok" : "status-missing";
+    const oauthDisabled = state.oauthConfigured ? "" : "disabled";
+    const apiStatus = state.apiTokenConfigured ? "Configured" : "Missing";
+    const apiStatusClass = state.apiTokenConfigured ? "status-ok" : "status-missing";
+    if (devServerUrl) {
+        return getDevServerHtml(webview, devServerUrl);
+    }
     if (devPath && fs.existsSync(devPath)) {
         const template = fs.readFileSync(devPath, "utf8");
         return renderTemplate(template, {
@@ -267,6 +287,36 @@ function resolveDevPath(extensionPath) {
         return defaultPath;
     }
     return "";
+}
+function normalizeDevServerUrl(value) {
+    if (!value) {
+        return "";
+    }
+    return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+function getDevServerHtml(webview, devServerUrl) {
+    const nonce = String(Date.now());
+    let origin = devServerUrl;
+    try {
+        origin = new URL(devServerUrl).origin;
+    }
+    catch {
+        // ignore invalid URL
+    }
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline' ${origin}; script-src ${webview.cspSource} 'unsafe-eval' 'unsafe-inline' ${origin}; connect-src ${origin} ws:; img-src ${webview.cspSource} https: data:; font-src ${webview.cspSource} https: data:;"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atlassian Login (Dev)</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script nonce="${nonce}" type="module" src="${origin}/@vite/client"></script>
+  <script nonce="${nonce}" type="module" src="${origin}/src/main.ts"></script>
+</body>
+</html>`;
 }
 function renderTemplate(template, values) {
     return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, key) => values[key] ?? "");
