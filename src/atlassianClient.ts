@@ -3,6 +3,7 @@ import * as http from "http";
 import * as https from "https";
 import { AddressInfo } from "net";
 import * as vscode from "vscode";
+import { getOAuthConfig } from "./atlassianConfig";
 
 export interface JiraIssue {
   key: string;
@@ -85,11 +86,7 @@ export class AtlassianClient {
   }
 
   async startOAuthFlow(): Promise<boolean> {
-    const config = vscode.workspace.getConfiguration("atlassian");
-    const clientId = (config.get<string>("oauthClientId") || "").trim();
-    const clientSecret = (config.get<string>("oauthClientSecret") || "").trim();
-    const scopes = (config.get<string>("oauthScopes") || "read:jira-work offline_access").trim();
-    const redirectPort = config.get<number>("oauthRedirectPort") || 8765;
+    const { clientId, clientSecret, scopes, redirectPort } = getOAuthConfig();
 
     if (!clientId || !clientSecret) {
       vscode.window.showWarningMessage(
@@ -116,6 +113,7 @@ export class AtlassianClient {
     authUrl.searchParams.set("code_challenge", codeChallenge);
     authUrl.searchParams.set("code_challenge_method", "S256");
 
+    vscode.window.showInformationMessage("Opening Atlassian OAuth login in your browser.");
     await vscode.env.openExternal(vscode.Uri.parse(authUrl.toString()));
 
     const code = await waitForCode;
@@ -254,9 +252,7 @@ export class AtlassianClient {
       return auth.accessToken;
     }
 
-    const config = vscode.workspace.getConfiguration("atlassian");
-    const clientId = (config.get<string>("oauthClientId") || "").trim();
-    const clientSecret = (config.get<string>("oauthClientSecret") || "").trim();
+    const { clientId, clientSecret } = getOAuthConfig();
 
     if (!clientId || !clientSecret) {
       return auth.accessToken;

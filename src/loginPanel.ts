@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { AtlassianClient } from "./atlassianClient";
+import { getOAuthConfig } from "./atlassianConfig";
 import { AtlassianIssuesProvider } from "./issueProvider";
 
 export class LoginPanel {
@@ -16,7 +17,9 @@ export class LoginPanel {
     );
 
     const defaults = await client.getApiTokenDefaults();
-    panel.webview.html = getWebviewHtml(panel.webview, defaults);
+    const oauthConfig = getOAuthConfig();
+    const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
+    panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured);
 
     panel.webview.onDidReceiveMessage(async (message) => {
       try {
@@ -34,17 +37,6 @@ export class LoginPanel {
         }
 
         if (message.type === "startOAuth") {
-          const config = vscode.workspace.getConfiguration("atlassian");
-          const clientId = (config.get<string>("oauthClientId") || "").trim();
-          const clientSecret = (config.get<string>("oauthClientSecret") || "").trim();
-          if (!clientId || !clientSecret) {
-            vscode.window.showWarningMessage(
-              "Set Atlassian OAuth client ID and secret in Settings, or use an API token.",
-            );
-            await vscode.commands.executeCommand("workbench.action.openSettings", "Atlassian");
-            return;
-          }
-          vscode.window.showInformationMessage("Opening Atlassian OAuth login in your browser.");
           const started = await client.startOAuthFlow();
           if (!started) {
             return;
@@ -70,10 +62,14 @@ export class LoginPanel {
 function getWebviewHtml(
   webview: vscode.Webview,
   defaults: { baseUrl: string; email: string },
+  oauthConfigured: boolean,
 ): string {
   const nonce = String(Date.now());
   const baseUrl = escapeHtml(defaults.baseUrl);
   const email = escapeHtml(defaults.email);
+  const oauthStatus = oauthConfigured ? "Configured" : "Missing";
+  const oauthStatusClass = oauthConfigured ? "status-ok" : "status-missing";
+  const oauthDisabled = oauthConfigured ? "" : "disabled";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -140,6 +136,15 @@ function getWebviewHtml(
       color: var(--vscode-descriptionForeground);
       margin-top: 8px;
     }
+    .status {
+      font-weight: 600;
+    }
+    .status-ok {
+      color: #2ea043;
+    }
+    .status-missing {
+      color: #d73a49;
+    }
   </style>
 </head>
 <body>
@@ -168,9 +173,10 @@ function getWebviewHtml(
   <div class="card">
     <h2>OAuth 2.0 (3LO)</h2>
     <p class="note">Requires an Atlassian OAuth app with a redirect URL. Configure client ID and secret in VS Code Settings.</p>
+    <p class="note">OAuth settings: <span class="status ${oauthStatusClass}">${oauthStatus}</span></p>
     <div class="actions">
       <button id="openSettings" class="secondary">Open Settings</button>
-      <button id="startOAuth">Start OAuth Login</button>
+      <button id="startOAuth" ${oauthDisabled}>Start OAuth Login</button>
     </div>
   </div>
 

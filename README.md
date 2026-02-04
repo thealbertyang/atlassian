@@ -34,6 +34,16 @@ Shows your open sprint Jira issues in the Explorer view.
 - `atlassian.oauthScopes`: OAuth scopes (default: `read:jira-work offline_access`).
 - `atlassian.oauthRedirectPort`: Local port for OAuth callback.
 
+### Environment Overrides
+
+You can supply OAuth settings via `.env.local` (or `.env`) in the workspace root.
+The extension loads these and will also resolve `${env:VAR}` placeholders in settings.
+
+- `ATLASSIAN_OAUTH_CLIENT_ID`
+- `ATLASSIAN_OAUTH_CLIENT_SECRET`
+- `ATLASSIAN_OAUTH_SCOPES`
+- `ATLASSIAN_OAUTH_REDIRECT_PORT`
+
 ## Commands
 
 - `Atlassian: Login`
@@ -51,5 +61,14 @@ Shows your open sprint Jira issues in the Explorer view.
 
 ## Install (Code - Insiders)
 
-- `bun run install:extension` installs the VSIX and attempts to reload the window via AppleScript.
+- `bun run install:extension:local` installs the local VSIX and attempts to reload the window via AppleScript.
+  `bun run install:extension` is an alias for `install:extension:local`.
+- `bun run install:extension:market` installs the Marketplace build.
   If the reload step fails, grant Accessibility permissions to your terminal, or run `Developer: Reload Window` manually.
+
+## Publish
+
+- `bun run publish` publishes the current version using `VSCE_PAT` from `.env.local`.
+- `bun run publish:patch` bumps the patch version and publishes.
+- `bun run publish:minor` bumps the minor version and publishes.
+- `bun run publish:major` bumps the major version and publishes.

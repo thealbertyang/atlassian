@@ -35,11 +35,14 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginPanel = void 0;
 const vscode = __importStar(require("vscode"));
+const atlassianConfig_1 = require("./atlassianConfig");
 class LoginPanel {
     static async show(context, client, provider) {
         const panel = vscode.window.createWebviewPanel("atlassianLogin", "Atlassian Login", vscode.ViewColumn.Active, { enableScripts: true });
         const defaults = await client.getApiTokenDefaults();
-        panel.webview.html = getWebviewHtml(panel.webview, defaults);
+        const oauthConfig = (0, atlassianConfig_1.getOAuthConfig)();
+        const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
+        panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured);
         panel.webview.onDidReceiveMessage(async (message) => {
             try {
                 if (message.type === "error") {
@@ -54,15 +57,6 @@ class LoginPanel {
                     return;
                 }
                 if (message.type === "startOAuth") {
-                    const config = vscode.workspace.getConfiguration("atlassian");
-                    const clientId = (config.get("oauthClientId") || "").trim();
-                    const clientSecret = (config.get("oauthClientSecret") || "").trim();
-                    if (!clientId || !clientSecret) {
-                        vscode.window.showWarningMessage("Set Atlassian OAuth client ID and secret in Settings, or use an API token.");
-                        await vscode.commands.executeCommand("workbench.action.openSettings", "Atlassian");
-                        return;
-                    }
-                    vscode.window.showInformationMessage("Opening Atlassian OAuth login in your browser.");
                     const started = await client.startOAuthFlow();
                     if (!started) {
                         return;
@@ -85,10 +79,13 @@ class LoginPanel {
     }
 }
 exports.LoginPanel = LoginPanel;
-function getWebviewHtml(webview, defaults) {
+function getWebviewHtml(webview, defaults, oauthConfigured) {
     const nonce = String(Date.now());
     const baseUrl = escapeHtml(defaults.baseUrl);
     const email = escapeHtml(defaults.email);
+    const oauthStatus = oauthConfigured ? "Configured" : "Missing";
+    const oauthStatusClass = oauthConfigured ? "status-ok" : "status-missing";
+    const oauthDisabled = oauthConfigured ? "" : "disabled";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -154,6 +151,15 @@ function getWebviewHtml(webview, defaults) {
       color: var(--vscode-descriptionForeground);
       margin-top: 8px;
     }
+    .status {
+      font-weight: 600;
+    }
+    .status-ok {
+      color: #2ea043;
+    }
+    .status-missing {
+      color: #d73a49;
+    }
   </style>
 </head>
 <body>
@@ -182,9 +188,10 @@ function getWebviewHtml(webview, defaults) {
   <div class="card">
     <h2>OAuth 2.0 (3LO)</h2>
     <p class="note">Requires an Atlassian OAuth app with a redirect URL. Configure client ID and secret in VS Code Settings.</p>
+    <p class="note">OAuth settings: <span class="status ${oauthStatusClass}">${oauthStatus}</span></p>
     <div class="actions">
       <button id="openSettings" class="secondary">Open Settings</button>
-      <button id="startOAuth">Start OAuth Login</button>
+      <button id="startOAuth" ${oauthDisabled}>Start OAuth Login</button>
     </div>
   </div>
 

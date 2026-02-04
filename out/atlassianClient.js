@@ -38,6 +38,7 @@ const crypto = __importStar(require("crypto"));
 const http = __importStar(require("http"));
 const https = __importStar(require("https"));
 const vscode = __importStar(require("vscode"));
+const atlassianConfig_1 = require("./atlassianConfig");
 const STORAGE_KEYS = {
     authType: "atlassian.authType",
     baseUrl: "atlassian.baseUrl",
@@ -74,11 +75,7 @@ class AtlassianClient {
         await this.context.globalState.update(STORAGE_KEYS.authType, "apiToken");
     }
     async startOAuthFlow() {
-        const config = vscode.workspace.getConfiguration("atlassian");
-        const clientId = (config.get("oauthClientId") || "").trim();
-        const clientSecret = (config.get("oauthClientSecret") || "").trim();
-        const scopes = (config.get("oauthScopes") || "read:jira-work offline_access").trim();
-        const redirectPort = config.get("oauthRedirectPort") || 8765;
+        const { clientId, clientSecret, scopes, redirectPort } = (0, atlassianConfig_1.getOAuthConfig)();
         if (!clientId || !clientSecret) {
             vscode.window.showWarningMessage("Set Atlassian OAuth client ID and secret in Settings, or use an API token.");
             await vscode.commands.executeCommand("workbench.action.openSettings", "Atlassian");
@@ -98,6 +95,7 @@ class AtlassianClient {
         authUrl.searchParams.set("prompt", "consent");
         authUrl.searchParams.set("code_challenge", codeChallenge);
         authUrl.searchParams.set("code_challenge_method", "S256");
+        vscode.window.showInformationMessage("Opening Atlassian OAuth login in your browser.");
         await vscode.env.openExternal(vscode.Uri.parse(authUrl.toString()));
         const code = await waitForCode;
         const token = await requestJson(OAUTH_TOKEN_URL, {
@@ -217,9 +215,7 @@ class AtlassianClient {
         if (!auth.refreshToken) {
             return auth.accessToken;
         }
-        const config = vscode.workspace.getConfiguration("atlassian");
-        const clientId = (config.get("oauthClientId") || "").trim();
-        const clientSecret = (config.get("oauthClientSecret") || "").trim();
+        const { clientId, clientSecret } = (0, atlassianConfig_1.getOAuthConfig)();
         if (!clientId || !clientSecret) {
             return auth.accessToken;
         }

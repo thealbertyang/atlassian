@@ -7,7 +7,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const client = new AtlassianClient(context);
   const provider = new AtlassianIssuesProvider(client);
 
-  context.subscriptions.push(vscode.window.registerTreeDataProvider("atlassianIssues", provider));
+  registerTreeProvider(context, provider);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("atlassian.refresh", () => provider.refresh()),
@@ -36,4 +36,20 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   // no-op
+}
+
+function registerTreeProvider(
+  context: vscode.ExtensionContext,
+  provider: AtlassianIssuesProvider,
+  attempt = 0,
+): void {
+  try {
+    context.subscriptions.push(vscode.window.registerTreeDataProvider("atlassianIssues", provider));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Failed to register view (attempt ${attempt + 1}): ${message}`);
+    if (attempt < 3) {
+      setTimeout(() => registerTreeProvider(context, provider, attempt + 1), 500);
+    }
+  }
 }

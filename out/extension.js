@@ -42,7 +42,7 @@ const loginPanel_1 = require("./loginPanel");
 function activate(context) {
     const client = new atlassianClient_1.AtlassianClient(context);
     const provider = new issueProvider_1.AtlassianIssuesProvider(client);
-    context.subscriptions.push(vscode.window.registerTreeDataProvider("atlassianIssues", provider));
+    registerTreeProvider(context, provider);
     context.subscriptions.push(vscode.commands.registerCommand("atlassian.refresh", () => provider.refresh()), vscode.commands.registerCommand("atlassian.login", async () => {
         await loginPanel_1.LoginPanel.show(context, client, provider);
     }), vscode.commands.registerCommand("atlassian.logout", async () => {
@@ -64,5 +64,17 @@ function activate(context) {
 }
 function deactivate() {
     // no-op
+}
+function registerTreeProvider(context, provider, attempt = 0) {
+    try {
+        context.subscriptions.push(vscode.window.registerTreeDataProvider("atlassianIssues", provider));
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`Failed to register view (attempt ${attempt + 1}): ${message}`);
+        if (attempt < 3) {
+            setTimeout(() => registerTreeProvider(context, provider, attempt + 1), 500);
+        }
+    }
 }
 //# sourceMappingURL=extension.js.map

@@ -1,11 +1,23 @@
 {
   "name": "atlassian-sprint-view",
   "displayName": "Atlassian Sprint Issues",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "Show your open sprint Jira issues in a Tree View.",
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "atlassian",
+    "extension",
+    "issues",
+    "jira",
+    "sprint",
+    "vscode"
+  ],
+  "homepage": "https://marketplace.visualstudio.com/items?itemName=albertyang.atlassian-sprint-view",
+  "bugs": {
+    "url": "https://github.com/thealbertyang/atlassian/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -14,15 +26,21 @@
   "publisher": "albertyang",
   "main": "./out/extension.js",
   "scripts": {
-    "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile",
     "compile": "tsgo -p ./",
-    "package:extension": "node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license",
-    "install:extension": "bun run compile && bun run package:extension && code-insiders --install-extension atlassian-sprint-view.vsix --force && osascript ./scripts/reload-insiders.applescript",
     "watch": "tsgo -watch -p ./",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check"
+    "fmt:check": "oxfmt --check",
+    "package:extension": "node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license",
+    "install:extension": "bun run install:extension:local",
+    "install:extension:local": "bun run compile && bun run package:extension && code-insiders --install-extension atlassian-sprint-view.vsix --force && osascript ./scripts/reload-insiders.applescript",
+    "install:extension:market": "code-insiders --install-extension albertyang.atlassian-sprint-view --force",
+    "publish": "bash -lc 'set -a && [ -f .env.local ] && source .env.local && set +a && node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce publish -p \"$VSCE_PAT\"'",
+    "publish:patch": "node ./scripts/bump-version.js patch && bun run publish",
+    "publish:minor": "node ./scripts/bump-version.js minor && bun run publish",
+    "publish:major": "node ./scripts/bump-version.js major && bun run publish",
+    "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
