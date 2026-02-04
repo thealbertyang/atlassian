@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+atlassian-sprint-view.vsix
+*.log
+
+# macOS
+.DS_Store
+
+# editor
+.vscode/

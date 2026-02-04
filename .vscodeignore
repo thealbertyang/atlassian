@@ -1,0 +1,11 @@
+**/node_modules/**
+**/.git/**
+**/.DS_Store
+**/*.ts
+src/**
+scripts/**
+.vscode/**
+.gitignore
+.vscodeignore
+atlassian-sprint-view.vsix
+bun.lock

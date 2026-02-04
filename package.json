@@ -1,0 +1,141 @@
+{
+  "name": "atlassian-sprint-view",
+  "displayName": "Atlassian Sprint Issues",
+  "version": "0.0.1",
+  "description": "Show your open sprint Jira issues in a Tree View.",
+  "categories": [
+    "Other"
+  ],
+  "publisher": "AlbertYang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thealbertyang/atlassian.git"
+  },
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile",
+    "compile": "tsgo -p ./",
+    "package:extension": "node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license",
+    "install:extension": "bun run compile && bun run package:extension && code-insiders --install-extension atlassian-sprint-view.vsix --force && osascript ./scripts/reload-insiders.applescript",
+    "watch": "tsgo -watch -p ./",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.86.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260203.1",
+    "@vscode/vsce": "^3.6.2",
+    "oxfmt": "^0.28.0",
+    "oxlint": "^1.43.0",
+    "typescript": "^5.4.2"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "atlassian.login",
+        "title": "Atlassian: Login"
+      },
+      {
+        "command": "atlassian.logout",
+        "title": "Atlassian: Logout"
+      },
+      {
+        "command": "atlassian.refresh",
+        "title": "Atlassian: Refresh Issues"
+      },
+      {
+        "command": "atlassian.openIssue",
+        "title": "Atlassian: Open Issue"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "atlassianIssues",
+          "name": "Atlassian Sprint"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "atlassianIssues",
+        "contents": "Sign in to Atlassian to view your sprint issues.\\n[Sign in](command:atlassian.login)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "atlassian.refresh",
+          "when": "view == atlassianIssues",
+          "group": "navigation"
+        },
+        {
+          "command": "atlassian.login",
+          "when": "view == atlassianIssues",
+          "group": "navigation"
+        },
+        {
+          "command": "atlassian.logout",
+          "when": "view == atlassianIssues",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "atlassian.openIssue",
+          "when": "view == atlassianIssues && viewItem == atlassianIssue",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Atlassian",
+      "properties": {
+        "atlassian.oauthClientId": {
+          "type": "string",
+          "default": "",
+          "description": "Atlassian OAuth 2.0 (3LO) client ID from developer.atlassian.com."
+        },
+        "atlassian.oauthClientSecret": {
+          "type": "string",
+          "default": "",
+          "description": "Atlassian OAuth 2.0 (3LO) client secret. Required for token exchange."
+        },
+        "atlassian.oauthScopes": {
+          "type": "string",
+          "default": "read:jira-work offline_access",
+          "description": "OAuth scopes to request."
+        },
+        "atlassian.oauthRedirectPort": {
+          "type": "number",
+          "default": 8765,
+          "description": "Local port used for OAuth callback. Add http://127.0.0.1:PORT/callback to your Atlassian OAuth app."
+        },
+        "atlassian.jql": {
+          "type": "string",
+          "default": "assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC",
+          "description": "JQL used to load sprint issues."
+        },
+        "atlassian.maxResults": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum number of issues to fetch per refresh."
+        }
+      }
+    }
+  },
+  "activationEvents": [
+    "onCommand:atlassian.login",
+    "onCommand:atlassian.logout",
+    "onCommand:atlassian.openIssue",
+    "onCommand:atlassian.refresh",
+    "onView:atlassianIssues"
+  ],
+  "engines": {
+    "vscode": "^1.86.0"
+  }
+}
