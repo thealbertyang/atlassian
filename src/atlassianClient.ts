@@ -3,7 +3,7 @@ import * as http from "http";
 import * as https from "https";
 import { AddressInfo } from "net";
 import * as vscode from "vscode";
-import { getOAuthConfig } from "./atlassianConfig";
+import { getApiTokenConfig, getOAuthConfig } from "./atlassianConfig";
 
 export interface JiraIssue {
   key: string;
@@ -72,8 +72,10 @@ export class AtlassianClient {
   }
 
   async getApiTokenDefaults(): Promise<{ baseUrl: string; email: string }> {
-    const baseUrl = this.context.globalState.get<string>(STORAGE_KEYS.baseUrl) ?? "";
-    const email = this.context.globalState.get<string>(STORAGE_KEYS.email) ?? "";
+    const envConfig = getApiTokenConfig();
+    const baseUrl =
+      envConfig.baseUrl || this.context.globalState.get<string>(STORAGE_KEYS.baseUrl) || "";
+    const email = envConfig.email || this.context.globalState.get<string>(STORAGE_KEYS.email) || "";
     return { baseUrl, email };
   }
 
@@ -159,11 +161,22 @@ export class AtlassianClient {
   async searchMyOpenSprintIssues(): Promise<JiraIssue[]> {
     const auth = await this.getAuth();
     if (!auth) {
+      const envConfig = getApiTokenConfig();
+      if (envConfig.baseUrl && envConfig.email && envConfig.apiToken) {
+        await this.saveApiTokenAuth(envConfig.baseUrl, envConfig.email, envConfig.apiToken);
+        if (envConfig.jql) {
+          await vscode.workspace
+            .getConfiguration("atlassian")
+            .update("jql", envConfig.jql, vscode.ConfigurationTarget.Workspace);
+        }
+        return this.searchMyOpenSprintIssues();
+      }
       return [];
     }
 
     const config = vscode.workspace.getConfiguration("atlassian");
-    const jql = (config.get<string>("jql") || "").trim();
+    const envConfig = getApiTokenConfig();
+    const jql = (envConfig.jql || config.get<string>("jql") || "").trim();
     const maxResults = Math.max(1, Math.min(100, config.get<number>("maxResults") || 50));
 
     const fields = ["summary", "status", "issuetype", "project"].join(",");
@@ -442,7 +455,7 @@ async function requestJson<T>(
             }
             try {
               resolve(JSON.parse(data) as T);
-            } catch (error) {
+            } catch {
               reject(new Error("Failed to parse JSON response."));
             }
             return;

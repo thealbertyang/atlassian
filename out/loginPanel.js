@@ -40,9 +40,10 @@ class LoginPanel {
     static async show(context, client, provider) {
         const panel = vscode.window.createWebviewPanel("atlassianLogin", "Atlassian Login", vscode.ViewColumn.Active, { enableScripts: true });
         const defaults = await client.getApiTokenDefaults();
+        const envApiConfig = (0, atlassianConfig_1.getApiTokenConfig)();
         const oauthConfig = (0, atlassianConfig_1.getOAuthConfig)();
         const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
-        panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured);
+        panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured, Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken));
         panel.webview.onDidReceiveMessage(async (message) => {
             try {
                 if (message.type === "error") {
@@ -79,13 +80,15 @@ class LoginPanel {
     }
 }
 exports.LoginPanel = LoginPanel;
-function getWebviewHtml(webview, defaults, oauthConfigured) {
+function getWebviewHtml(webview, defaults, oauthConfigured, apiTokenConfigured) {
     const nonce = String(Date.now());
     const baseUrl = escapeHtml(defaults.baseUrl);
     const email = escapeHtml(defaults.email);
     const oauthStatus = oauthConfigured ? "Configured" : "Missing";
     const oauthStatusClass = oauthConfigured ? "status-ok" : "status-missing";
     const oauthDisabled = oauthConfigured ? "" : "disabled";
+    const apiStatus = apiTokenConfigured ? "Configured" : "Missing";
+    const apiStatusClass = apiTokenConfigured ? "status-ok" : "status-missing";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -167,6 +170,7 @@ function getWebviewHtml(webview, defaults, oauthConfigured) {
 
   <div class="card">
     <h2>API Token</h2>
+    <p class="note">API settings: <span class="status ${apiStatusClass}">${apiStatus}</span></p>
     <div class="row">
       <label for="baseUrl">Jira site URL</label>
       <input id="baseUrl" type="text" placeholder="https://your-domain.atlassian.net" value="${baseUrl}" />

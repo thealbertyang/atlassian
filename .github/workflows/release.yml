@@ -33,7 +33,7 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce publish -p "$VSCE_PAT"
+          node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce publish -p "$VSCE_PAT" --skip-duplicate
 
       - name: Create GitHub Release + Upload VSIX
         uses: softprops/action-gh-release@v2

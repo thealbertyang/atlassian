@@ -9,6 +9,13 @@ export interface OAuthConfig {
   redirectPort: number;
 }
 
+export interface ApiTokenConfig {
+  baseUrl: string;
+  email: string;
+  apiToken: string;
+  jql: string;
+}
+
 export function getOAuthConfig(): OAuthConfig {
   const config = vscode.workspace.getConfiguration("atlassian");
   const env = getEnvMap();
@@ -32,6 +39,33 @@ export function getOAuthConfig(): OAuthConfig {
   );
 
   return { clientId, clientSecret, scopes, redirectPort };
+}
+
+export function getApiTokenConfig(): ApiTokenConfig {
+  const config = vscode.workspace.getConfiguration("atlassian");
+  const env = getEnvMap();
+
+  const baseUrl =
+    getEnvValue(env, "JIRA_URL") ||
+    getEnvValue(env, "ATLASSIAN_BASE_URL") ||
+    resolveEnvPlaceholders(String(config.get("baseUrl") || config.get("jiraUrl") || ""), env);
+  const email =
+    getEnvValue(env, "JIRA_USER_EMAIL") ||
+    getEnvValue(env, "ATLASSIAN_EMAIL") ||
+    resolveEnvPlaceholders(String(config.get("email") || ""), env);
+  const apiToken =
+    getEnvValue(env, "JIRA_API_TOKEN") ||
+    getEnvValue(env, "ATLASSIAN_API_TOKEN") ||
+    resolveEnvPlaceholders(String(config.get("apiToken") || ""), env);
+  const jql =
+    getEnvValue(env, "JIRA_JQL") || resolveEnvPlaceholders(String(config.get("jql") || ""), env);
+
+  return {
+    baseUrl: baseUrl.trim(),
+    email: email.trim(),
+    apiToken: apiToken.trim(),
+    jql: jql.trim(),
+  };
 }
 
 function getConfigString(
@@ -92,6 +126,10 @@ function resolveEnvPlaceholders(value: string | undefined, env: Record<string, s
   }
 
   return value.replace(/\$\{env:([^}]+)\}/g, (_match, name) => env[name] ?? "");
+}
+
+function getEnvValue(env: Record<string, string>, key: string): string {
+  return env[key] ?? "";
 }
 
 function getEnvMap(): Record<string, string> {

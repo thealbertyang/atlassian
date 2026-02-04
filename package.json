@@ -1,40 +1,59 @@
 {
   "name": "atlassian-sprint-view",
   "displayName": "Atlassian Sprint Issues",
+  "version": "0.0.7",
   "description": "Show your open sprint Jira issues in a Tree View.",
-  "version": "0.0.6",
-  "publisher": "albertyang",
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "atlassian",
+    "extension",
+    "issues",
+    "jira",
+    "sprint",
+    "vscode"
+  ],
+  "homepage": "https://marketplace.visualstudio.com/items?itemName=albertyang.atlassian-sprint-view",
+  "bugs": {
+    "url": "https://github.com/thealbertyang/atlassian/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/thealbertyang/atlassian.git"
   },
-  "homepage": "https://marketplace.visualstudio.com/items?itemName=albertyang.atlassian-sprint-view",
-  "bugs": {
-    "url": "https://github.com/thealbertyang/atlassian/issues"
-  },
-  "keywords": [
-    "atlassian",
-    "jira",
-    "sprint",
-    "issues",
-    "vscode",
-    "extension"
-  ],
-  "engines": {
-    "vscode": "^1.86.0"
-  },
-  "categories": [
-    "Other"
-  ],
+  "publisher": "albertyang",
   "main": "./out/extension.js",
-  "activationEvents": [
-    "onCommand:atlassian.login",
-    "onCommand:atlassian.logout",
-    "onCommand:atlassian.openIssue",
-    "onCommand:atlassian.refresh",
-    "onView:atlassianIssues"
-  ],
+  "scripts": {
+    "compile": "tsgo -p ./",
+    "watch": "tsgo -watch -p ./",
+    "lint": "oxlint src",
+    "lint:fix": "oxlint src --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "package:extension": "node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license",
+    "install:extension": "bun run install:extension:local",
+    "install:extension:local": "bun run compile && bun run package:extension && code-insiders --install-extension atlassian-sprint-view.vsix --force && osascript ./scripts/reload-insiders.applescript",
+    "install:extension:market": "code-insiders --install-extension albertyang.atlassian-sprint-view --force",
+    "install:extension:market:wait": "node ./scripts/install-marketplace.js",
+    "publish:only": "bash -lc 'set -a && [ -f .env.local ] && source .env.local && set +a && node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce publish -p \"$VSCE_PAT\"'",
+    "publish": "bun run publish:only && bun run install:extension:market:wait",
+    "publish:patch": "node ./scripts/bump-version.js patch && bun run publish && bun run release:tag",
+    "publish:minor": "node ./scripts/bump-version.js minor && bun run publish && bun run release:tag",
+    "publish:major": "node ./scripts/bump-version.js major && bun run publish && bun run release:tag",
+    "release:tag": "bash -lc 'VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git tag v$VERSION; git push origin v$VERSION'",
+    "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.86.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260203.1",
+    "@vscode/vsce": "^3.6.2",
+    "oxfmt": "^0.28.0",
+    "oxlint": "^1.43.0",
+    "typescript": "^5.4.2"
+  },
   "contributes": {
     "commands": [
       {
@@ -130,33 +149,14 @@
       }
     }
   },
-  "scripts": {
-    "compile": "tsgo -p ./",
-    "watch": "tsgo -watch -p ./",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check",
-    "package:extension": "node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license",
-    "install:extension": "bun run install:extension:local",
-    "install:extension:local": "bun run compile && bun run package:extension && code-insiders --install-extension atlassian-sprint-view.vsix --force && osascript ./scripts/reload-insiders.applescript",
-    "install:extension:market": "code-insiders --install-extension albertyang.atlassian-sprint-view --force",
-    "install:extension:market:wait": "node ./scripts/install-marketplace.js",
-    "publish:only": "bash -lc 'set -a && [ -f .env.local ] && source .env.local && set +a && node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce publish -p \"$VSCE_PAT\"'",
-    "publish": "bun run publish:only && bun run install:extension:market:wait",
-    "publish:patch": "node ./scripts/bump-version.js patch && bun run publish && bun run release:tag",
-    "publish:minor": "node ./scripts/bump-version.js minor && bun run publish && bun run release:tag",
-    "publish:major": "node ./scripts/bump-version.js major && bun run publish && bun run release:tag",
-    "release:tag": "bash -lc 'VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git tag v$VERSION; git push origin v$VERSION'",
-    "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile"
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.30",
-    "@types/vscode": "^1.86.0",
-    "@typescript/native-preview": "^7.0.0-dev.20260203.1",
-    "@vscode/vsce": "^3.6.2",
-    "oxfmt": "^0.28.0",
-    "oxlint": "^1.43.0",
-    "typescript": "^5.4.2"
+  "activationEvents": [
+    "onCommand:atlassian.login",
+    "onCommand:atlassian.logout",
+    "onCommand:atlassian.openIssue",
+    "onCommand:atlassian.refresh",
+    "onView:atlassianIssues"
+  ],
+  "engines": {
+    "vscode": "^1.86.0"
   }
 }

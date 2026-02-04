@@ -63,8 +63,9 @@ class AtlassianClient {
         return (await this.getAuth()) !== null;
     }
     async getApiTokenDefaults() {
-        const baseUrl = this.context.globalState.get(STORAGE_KEYS.baseUrl) ?? "";
-        const email = this.context.globalState.get(STORAGE_KEYS.email) ?? "";
+        const envConfig = (0, atlassianConfig_1.getApiTokenConfig)();
+        const baseUrl = envConfig.baseUrl || this.context.globalState.get(STORAGE_KEYS.baseUrl) || "";
+        const email = envConfig.email || this.context.globalState.get(STORAGE_KEYS.email) || "";
         return { baseUrl, email };
     }
     async saveApiTokenAuth(baseUrlInput, email, apiToken) {
@@ -135,10 +136,21 @@ class AtlassianClient {
     async searchMyOpenSprintIssues() {
         const auth = await this.getAuth();
         if (!auth) {
+            const envConfig = (0, atlassianConfig_1.getApiTokenConfig)();
+            if (envConfig.baseUrl && envConfig.email && envConfig.apiToken) {
+                await this.saveApiTokenAuth(envConfig.baseUrl, envConfig.email, envConfig.apiToken);
+                if (envConfig.jql) {
+                    await vscode.workspace
+                        .getConfiguration("atlassian")
+                        .update("jql", envConfig.jql, vscode.ConfigurationTarget.Workspace);
+                }
+                return this.searchMyOpenSprintIssues();
+            }
             return [];
         }
         const config = vscode.workspace.getConfiguration("atlassian");
-        const jql = (config.get("jql") || "").trim();
+        const envConfig = (0, atlassianConfig_1.getApiTokenConfig)();
+        const jql = (envConfig.jql || config.get("jql") || "").trim();
         const maxResults = Math.max(1, Math.min(100, config.get("maxResults") || 50));
         const fields = ["summary", "status", "issuetype", "project"].join(",");
         const query = new URLSearchParams({
@@ -361,7 +373,7 @@ async function requestJson(url, options) {
                     try {
                         resolve(JSON.parse(data));
                     }
-                    catch (error) {
+                    catch {
                         reject(new Error("Failed to parse JSON response."));
                     }
                     return;

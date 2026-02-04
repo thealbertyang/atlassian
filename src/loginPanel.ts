@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { AtlassianClient } from "./atlassianClient";
-import { getOAuthConfig } from "./atlassianConfig";
+import { getApiTokenConfig, getOAuthConfig } from "./atlassianConfig";
 import { AtlassianIssuesProvider } from "./issueProvider";
 
 export class LoginPanel {
@@ -17,9 +17,15 @@ export class LoginPanel {
     );
 
     const defaults = await client.getApiTokenDefaults();
+    const envApiConfig = getApiTokenConfig();
     const oauthConfig = getOAuthConfig();
     const oauthConfigured = Boolean(oauthConfig.clientId && oauthConfig.clientSecret);
-    panel.webview.html = getWebviewHtml(panel.webview, defaults, oauthConfigured);
+    panel.webview.html = getWebviewHtml(
+      panel.webview,
+      defaults,
+      oauthConfigured,
+      Boolean(envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken),
+    );
 
     panel.webview.onDidReceiveMessage(async (message) => {
       try {
@@ -63,6 +69,7 @@ function getWebviewHtml(
   webview: vscode.Webview,
   defaults: { baseUrl: string; email: string },
   oauthConfigured: boolean,
+  apiTokenConfigured: boolean,
 ): string {
   const nonce = String(Date.now());
   const baseUrl = escapeHtml(defaults.baseUrl);
@@ -70,6 +77,8 @@ function getWebviewHtml(
   const oauthStatus = oauthConfigured ? "Configured" : "Missing";
   const oauthStatusClass = oauthConfigured ? "status-ok" : "status-missing";
   const oauthDisabled = oauthConfigured ? "" : "disabled";
+  const apiStatus = apiTokenConfigured ? "Configured" : "Missing";
+  const apiStatusClass = apiTokenConfigured ? "status-ok" : "status-missing";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -152,6 +161,7 @@ function getWebviewHtml(
 
   <div class="card">
     <h2>API Token</h2>
+    <p class="note">API settings: <span class="status ${apiStatusClass}">${apiStatus}</span></p>
     <div class="row">
       <label for="baseUrl">Jira site URL</label>
       <input id="baseUrl" type="text" placeholder="https://your-domain.atlassian.net" value="${baseUrl}" />

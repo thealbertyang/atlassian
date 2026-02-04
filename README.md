@@ -44,6 +44,13 @@ The extension loads these and will also resolve `${env:VAR}` placeholders in set
 - `ATLASSIAN_OAUTH_SCOPES`
 - `ATLASSIAN_OAUTH_REDIRECT_PORT`
 
+API token settings can also be provided via `.env.local` (or `.env`):
+
+- `JIRA_URL` (e.g., `https://your-domain.atlassian.net`)
+- `JIRA_USER_EMAIL`
+- `JIRA_API_TOKEN`
+- `JIRA_JQL` (optional override for the JQL query)
+
 ## Commands
 
 - `Atlassian: Login`

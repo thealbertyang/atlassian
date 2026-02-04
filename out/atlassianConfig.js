@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getOAuthConfig = getOAuthConfig;
+exports.getApiTokenConfig = getApiTokenConfig;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
@@ -46,6 +47,26 @@ function getOAuthConfig() {
         "read:jira-work offline_access";
     const redirectPort = getConfigNumber(config, "oauthRedirectPort", "ATLASSIAN_OAUTH_REDIRECT_PORT", env, 8765);
     return { clientId, clientSecret, scopes, redirectPort };
+}
+function getApiTokenConfig() {
+    const config = vscode.workspace.getConfiguration("atlassian");
+    const env = getEnvMap();
+    const baseUrl = getEnvValue(env, "JIRA_URL") ||
+        getEnvValue(env, "ATLASSIAN_BASE_URL") ||
+        resolveEnvPlaceholders(String(config.get("baseUrl") || config.get("jiraUrl") || ""), env);
+    const email = getEnvValue(env, "JIRA_USER_EMAIL") ||
+        getEnvValue(env, "ATLASSIAN_EMAIL") ||
+        resolveEnvPlaceholders(String(config.get("email") || ""), env);
+    const apiToken = getEnvValue(env, "JIRA_API_TOKEN") ||
+        getEnvValue(env, "ATLASSIAN_API_TOKEN") ||
+        resolveEnvPlaceholders(String(config.get("apiToken") || ""), env);
+    const jql = getEnvValue(env, "JIRA_JQL") || resolveEnvPlaceholders(String(config.get("jql") || ""), env);
+    return {
+        baseUrl: baseUrl.trim(),
+        email: email.trim(),
+        apiToken: apiToken.trim(),
+        jql: jql.trim(),
+    };
 }
 function getConfigString(config, key, envKey, env) {
     const inspected = config.inspect(key);
@@ -84,6 +105,9 @@ function resolveEnvPlaceholders(value, env) {
         return "";
     }
     return value.replace(/\$\{env:([^}]+)\}/g, (_match, name) => env[name] ?? "");
+}
+function getEnvValue(env, key) {
+    return env[key] ?? "";
 }
 function getEnvMap() {
     const merged = {};
