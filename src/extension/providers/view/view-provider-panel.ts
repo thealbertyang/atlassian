@@ -9,6 +9,13 @@ import type { WebviewRoute } from "../../service/webview-route";
 import { IPC_COMMANDS, IPC_EVENTS } from "../../../shared/ipc-contract";
 import { buildRouteHash, routeHintToPath } from "../../../shared/route-contract";
 import { WebviewIpcHost } from "../../service/webview-ipc";
+import { getWebviewDevServerUrl } from "../data/atlassian/atlassianConfig";
+import { resolveDevPath } from "../../webview/paths";
+import {
+  getDevServerPort,
+  isLocalhostUrl,
+  normalizeDevServerUrl,
+} from "../../webview/reachability";
 
 export class ViewProviderPanel extends AbstractViewProvider {
   static readonly viewType = "atlassianAppWebviewPanel";
@@ -36,12 +43,15 @@ export class ViewProviderPanel extends AbstractViewProvider {
   async resolveWebviewView(webviewView: WebviewPanel) {
     const { webview } = webviewView;
     this.webviewReady = false;
-    const devPort = this.getDevPort();
+    const devInfo = this.getDevServerInfo();
     webview.options = {
       enableScripts: true,
       enableCommandUris: true,
       localResourceRoots: [this.context.extensionUri, Uri.joinPath(this.context.extensionUri, "out")],
-      portMapping: [{ webviewPort: devPort, extensionHostPort: devPort }],
+      portMapping:
+        this.context.extensionMode === ExtensionMode.Development && devInfo.isLocal
+          ? [{ webviewPort: devInfo.port, extensionHostPort: devInfo.port }]
+          : undefined,
     };
 
     this.exposeHandlersOnce(webview);
@@ -69,8 +79,12 @@ export class ViewProviderPanel extends AbstractViewProvider {
     this.renderTracker?.markRendered();
   }
 
-  private getDevPort(): number {
-    return DEFAULT_WEBVIEW_DEV_PORT;
+  private getDevServerInfo(): { url: string; port: number; isLocal: boolean } {
+    const configured = normalizeDevServerUrl(getWebviewDevServerUrl());
+    const fallback = `http://localhost:${DEFAULT_WEBVIEW_DEV_PORT}/`;
+    const url = configured || fallback;
+    const port = getDevServerPort(url) || DEFAULT_WEBVIEW_DEV_PORT;
+    return { url, port, isLocal: isLocalhostUrl(url) };
   }
 
   async updateWebview(webviewView: WebviewPanel) {
@@ -118,7 +132,7 @@ export class ViewProviderPanel extends AbstractViewProvider {
   }
 
   private getDevServerUrl(): string {
-    return `http://localhost:${this.getDevPort()}/`;
+    return this.getDevServerInfo().url;
   }
 
   private isAtlassianDevHtml(html: string): boolean {
@@ -133,7 +147,16 @@ export class ViewProviderPanel extends AbstractViewProvider {
     const devUrl = this.getDevServerUrl();
     const fetchedHtml = await this.fetchDevHtml(devUrl);
     if (!fetchedHtml) {
-      return undefined;
+      const devPath = resolveDevPath(this.context.extensionPath);
+      if (!devPath) {
+        return undefined;
+      }
+      try {
+        const htmlText = readFileSync(devPath, { encoding: "utf8" }).toString();
+        return this.buildWebviewHtml(webview, htmlText);
+      } catch {
+        return undefined;
+      }
     }
 
     const indexPath = join(this.context.extensionPath, this.wiewProviderOptions.indexPath);

@@ -13,6 +13,12 @@ import { ViewProviderPanel } from "./providers/view/view-provider-panel";
 import { DEFAULT_WEBVIEW_DEV_PORT, REOPEN_APP_AFTER_RESTART_KEY } from "./constants";
 import { resolveWebviewRoot } from "./webview/paths";
 import { StorageService } from "./service/storage-service";
+import { getWebviewDevServerUrl } from "./providers/data/atlassian/atlassianConfig";
+import {
+  getDevServerPort,
+  isLocalhostUrl,
+  normalizeDevServerUrl,
+} from "./webview/reachability";
 
 export function activate(context: vscode.ExtensionContext): void {
   outputChannel.show(true);
@@ -118,7 +124,14 @@ export function activate(context: vscode.ExtensionContext): void {
     buildWatcher.start(context.extensionPath);
     const cwd = resolveWebviewRoot(context.extensionPath);
     if (cwd) {
-      devWebviewServer.start(cwd, DEFAULT_WEBVIEW_DEV_PORT);
+      const configuredUrl = normalizeDevServerUrl(getWebviewDevServerUrl());
+      const devUrl = configuredUrl || `http://localhost:${DEFAULT_WEBVIEW_DEV_PORT}/`;
+      if (!configuredUrl || isLocalhostUrl(devUrl)) {
+        const port = getDevServerPort(devUrl) || DEFAULT_WEBVIEW_DEV_PORT;
+        devWebviewServer.start(cwd, port);
+      } else {
+        log(`Webview dev server not started (using ${configuredUrl}).`);
+      }
     } else {
       log("Webview dev server not started: src/webview not found.");
     }
@@ -148,6 +161,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("atlassian.login", async () => {
       log("Login command triggered");
       await showAppPanel();
+      navigateToRoute({ name: "setup" });
     }),
     vscode.commands.registerCommand("atlassian.logout", async () => {
       await client.clearAuth();

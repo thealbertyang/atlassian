@@ -13,6 +13,38 @@ export function getDevServerPort(url: string): number {
   }
 }
 
+export function normalizeDevServerUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  try {
+    const parsed = new URL(withScheme);
+    if (parsed.hostname === "0.0.0.0" || parsed.hostname === "::") {
+      parsed.hostname = "localhost";
+    }
+    return parsed.toString().endsWith("/") ? parsed.toString() : `${parsed.toString()}/`;
+  } catch {
+    return "";
+  }
+}
+
+export function isLocalhostUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname;
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0" ||
+      hostname === "::1" ||
+      hostname === "::"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function isDevServerReachable(url: string, timeoutMs = 350): Promise<boolean> {
   return new Promise((resolve) => {
     try {

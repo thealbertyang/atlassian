@@ -1,8 +1,14 @@
 import { commands, window } from "vscode";
 import { DEFAULT_WEBVIEW_DEV_PORT, REOPEN_APP_AFTER_RESTART_KEY } from "../constants";
+import { getWebviewDevServerUrl } from "../providers/data/atlassian/atlassianConfig";
 import { toPromise } from "../util/to-promise";
 import { resolveWebviewRoot } from "../webview/paths";
-import { waitForDevServer } from "../webview/reachability";
+import {
+  getDevServerPort,
+  isLocalhostUrl,
+  normalizeDevServerUrl,
+  waitForDevServer,
+} from "../webview/reachability";
 import type { HandlerDependencies } from "./types";
 
 type DevDependencies = Pick<
@@ -51,11 +57,19 @@ export const createDevHandlers = ({
       return;
     }
 
-    const port = DEFAULT_WEBVIEW_DEV_PORT;
+    const configuredUrl = normalizeDevServerUrl(getWebviewDevServerUrl());
+    const devUrl = configuredUrl || `http://localhost:${DEFAULT_WEBVIEW_DEV_PORT}/`;
+    if (configuredUrl && !isLocalhostUrl(devUrl)) {
+      window.showWarningMessage(
+        `Webview dev server URL is set to ${configuredUrl}. Start it manually.`,
+      );
+      return;
+    }
+
+    const port = getDevServerPort(devUrl) || DEFAULT_WEBVIEW_DEV_PORT;
     devWebviewServer.start(cwd, port);
 
-    const activeUrl = `http://localhost:${port}`;
-    const ready = await waitForDevServer(activeUrl, 10, 350);
+    const ready = await waitForDevServer(devUrl, 10, 350);
     if (ready) {
       await refreshApp();
     } else {

@@ -8,12 +8,6 @@ export function resolveDevPath(extensionPath: string): string {
   if (configured) {
     return configured;
   }
-
-  const defaultPath = path.join(extensionPath, "src", "webview", "index.html");
-  if (fs.existsSync(defaultPath)) {
-    return defaultPath;
-  }
-
   return "";
 }
 
