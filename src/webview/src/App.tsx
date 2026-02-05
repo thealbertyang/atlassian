@@ -111,8 +111,7 @@ function App({ children }: AppProps) {
   }, [state]);
 
   const issueView = searchParams.get("view") === "compact" ? "compact" : "full";
-  const authLabel =
-    state.authType === "oauth" ? "OAuth 2.0" : state.authType === "apiToken" ? "API token" : "";
+  const authLabel = state.authType === "apiToken" ? "API token" : "";
 
   const loadState = async () => {
     if (!isWebview) {
@@ -123,7 +122,7 @@ function App({ children }: AppProps) {
     try {
       const nextState = await handlers.getState();
       setState(nextState);
-      const shouldMaskToken = Boolean(nextState.apiTokenConfigured && nextState.authType !== "oauth");
+      const shouldMaskToken = Boolean(nextState.apiTokenConfigured);
       setForm((prev) => ({
         baseUrl: nextState.baseUrl || prev.baseUrl,
         email: nextState.email || prev.email,
@@ -248,7 +247,7 @@ function App({ children }: AppProps) {
     const baseUrl = form.baseUrl.trim();
     const email = form.email.trim();
     const rawToken = form.apiToken.trim();
-    const hasExistingToken = Boolean(state.apiTokenConfigured) && state.authType !== "oauth";
+    const hasExistingToken = Boolean(state.apiTokenConfigured);
     if (!baseUrl || !email || (!rawToken && !hasExistingToken)) {
       setError("All fields are required.");
       return;
@@ -330,6 +329,29 @@ function App({ children }: AppProps) {
     await handlers.openIssueInBrowser(issueKey);
   };
 
+  const refreshIssue = useCallback(() => {
+    if (!isWebview || !issueKey) {
+      return;
+    }
+    setIssueLoading(true);
+    setIssueError("");
+    handlers
+      .getIssue(issueKey)
+      .then((result) => {
+        setIssue(result);
+        if (!result) {
+          setIssueError("Issue not found or not authorized.");
+        }
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "Failed to load issue.";
+        setIssueError(message);
+      })
+      .finally(() => {
+        setIssueLoading(false);
+      });
+  }, [handlers, issueKey]);
+
   const deepLinkBase =
     state.uriScheme && state.extensionId
       ? `${state.uriScheme}://${state.extensionId}`
@@ -399,6 +421,7 @@ function App({ children }: AppProps) {
         issueView,
         setIssueView,
         openIssueInBrowser,
+        refreshIssue,
         navigate: navigateTo,
         routeName,
       }}

@@ -40,6 +40,7 @@ export type AppContextValue = {
   issueView: "compact" | "full";
   setIssueView: (view: "compact" | "full") => void;
   openIssueInBrowser: () => Promise<void>;
+  refreshIssue: () => void;
   navigate: (path: string) => void;
   routeName: string;
 };
