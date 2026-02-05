@@ -3,14 +3,14 @@
   "configurations": [
     {
       "name": "Attach (Current Window)",
-      "type": "extensionHost",
+      "type": "node",
       "request": "attach",
       "port": 9229,
       "outFiles": ["${workspaceFolder}/out/**/*.js"]
     },
     {
       "name": "Run Extension (HMR)",
-      "type": "extensionHost",
+      "type": "node",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],

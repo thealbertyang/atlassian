@@ -28,20 +28,6 @@
 	"workspaces": [
 		"src/webview"
 	],
-	"activationEvents": [
-		"onUri",
-		"onView:atlassianIssues",
-		"onCommand:atlassian.login",
-		"onCommand:atlassian.openApp",
-		"onCommand:atlassian.logout",
-		"onCommand:atlassian.refresh",
-		"onCommand:atlassian.openIssue",
-		"onCommand:atlassian.runDevWebview",
-		"onCommand:atlassian.restartExtensionHost",
-		"onCommand:atlassian.reloadWebviews",
-		"onCommand:atlassian.syncEnvToSettings",
-		"onCommand:atlassian.reinstallExtension"
-	],
 	"scripts": {
 		"dev": "bun run dev:ext",
 		"dev:ext": "bun run build:ext --watch",
@@ -130,7 +116,8 @@
 			"explorer": [
 				{
 					"id": "atlassianIssues",
-					"name": "Atlassian Sprint"
+					"name": "Atlassian Sprint",
+					"icon": "resources/atlassian-view.svg"
 				}
 			]
 		},
