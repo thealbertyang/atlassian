@@ -1,4 +1,5 @@
 import { createAuthHandlers } from "./auth";
+import { createDocsHandlers } from "./docs";
 import { createDevHandlers } from "./dev";
 import { createHttpHandlers } from "./http";
 import { createIssueHandlers } from "./issues";
@@ -16,6 +17,7 @@ export const getHandlers = (dependencies: HandlerDependencies) => ({
   ...createAuthHandlers(dependencies),
   ...createIssueHandlers(dependencies),
   ...createSettingsHandlers(dependencies),
+  ...createDocsHandlers(dependencies),
   ...createDevHandlers(dependencies),
 });
 

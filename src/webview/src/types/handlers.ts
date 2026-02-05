@@ -67,6 +67,7 @@ export type HandlersType = {
   getIssue: (key: string) => Promise<JiraIssueDetails | null>;
   getDocsIndex: () => Promise<DocsIndex>;
   getDocContent: (id: string) => Promise<DocContent | null>;
+  revealDocAsset: (baseId: string, href: string) => Promise<boolean>;
   saveApiToken: (baseUrl: string, email: string, apiToken: string) => Promise<void>;
   disconnect: () => Promise<void>;
   openSettings: () => Promise<void>;

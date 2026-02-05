@@ -20,6 +20,8 @@
     "@tanstack/history": "1.154.14",
     "@tanstack/react-start": "^1.158.1",
     "@tanstack/react-router": "^1.158.1",
+    "dompurify": "^3.0.9",
+    "marked": "^12.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
