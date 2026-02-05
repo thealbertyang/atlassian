@@ -1,0 +1,40 @@
+{
+  "name": "atlassian-webview",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "clean:stale-js": "bash -lc \"find src \\( -name '*.js' -o -name '*.js.map' \\) -delete\"",
+    "predev": "bun run clean:stale-js",
+    "prebuild": "bun run clean:stale-js",
+    "dev": "bunx vite",
+    "dev:webview": "bunx vite",
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "clear": "rimraf ./node_modules"
+  },
+  "dependencies": {
+    "@jsonrpc-rx/client": "^0.2.2",
+    "@tanstack/history": "1.154.14",
+    "@tanstack/react-start": "^1.158.1",
+    "@tanstack/react-router": "^1.158.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "@vitejs/plugin-react-swc": "^3.5.0",
+    "eslint": "^8.53.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.4",
+    "typescript": "^5.2.2",
+    "vite": "^7.3.1",
+    "vite-plugin-vscode-webview-hmr": "^1.0.1",
+    "@tanstack/router-plugin": "^1.158.1"
+  }
+}

@@ -1,183 +1,230 @@
 {
-  "name": "atlassian-sprint-view",
-  "displayName": "Atlassian Sprint Issues",
-  "version": "0.0.11",
-  "description": "Show your open sprint Jira issues in a Tree View.",
-  "categories": [
-    "Other"
-  ],
-  "keywords": [
-    "atlassian",
-    "extension",
-    "issues",
-    "jira",
-    "sprint",
-    "vscode"
-  ],
-  "homepage": "https://marketplace.visualstudio.com/items?itemName=albertyang.atlassian-sprint-view",
-  "bugs": {
-    "url": "https://github.com/thealbertyang/atlassian/issues"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/thealbertyang/atlassian.git"
-  },
-  "publisher": "albertyang",
-  "main": "./out/extension.js",
-  "scripts": {
-    "compile": "tsgo -p ./",
-    "watch": "tsgo -watch -p ./",
-    "dev": "bash ./scripts/dev-webview.sh",
-    "dev:webview": "bash ./scripts/dev-webview-server.sh",
-    "dev:webview:https": "bash ./scripts/dev-webview-https.sh",
-    "dev:hmr": "bash ./scripts/dev-hmr.sh",
-    "build:webview": "vite build --config webview-ui/vite.config.ts",
-    "lint": "oxlint src",
-    "lint:fix": "oxlint src --fix",
-    "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check",
-    "package:extension": "node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license",
-    "install:extension": "bun run install:extension:local",
-    "install:extension:local": "bun run compile && bun run package:extension && code-insiders --install-extension atlassian-sprint-view.vsix --force && osascript ./scripts/reload-insiders.applescript",
-    "install:extension:market": "code-insiders --install-extension albertyang.atlassian-sprint-view --force",
-    "install:extension:market:wait": "node ./scripts/install-marketplace.js",
-    "publish:only": "bash -lc 'set -a && [ -f .env.local ] && source .env.local && set +a && node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce publish -p \"$VSCE_PAT\"'",
-    "publish": "bun run publish:only && bun run install:extension:market:wait",
-    "publish:patch": "node ./scripts/bump-version.js patch && bun run publish && bun run release:tag",
-    "publish:minor": "node ./scripts/bump-version.js minor && bun run publish && bun run release:tag",
-    "publish:major": "node ./scripts/bump-version.js major && bun run publish && bun run release:tag",
-    "release:patch": "bash ./scripts/release-flow.sh patch",
-    "release:minor": "bash ./scripts/release-flow.sh minor",
-    "release:major": "bash ./scripts/release-flow.sh major",
-    "release:status": "bash ./scripts/release-status.sh",
-    "launchd:install": "bash ./scripts/launchd-install.sh",
-    "launchd:uninstall": "bash ./scripts/launchd-uninstall.sh",
-    "release:tag": "bash -lc 'VERSION=$(node -p \"require(\\\"./package.json\\\").version\"); git tag v$VERSION; git push origin v$VERSION'",
-    "vscode:prepublish": "bun run lint:fix && bun run fmt && bun run compile && bun run build:webview"
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.30",
-    "@types/vscode": "^1.86.0",
-    "@typescript/native-preview": "^7.0.0-dev.20260203.1",
-    "@vscode/vsce": "^3.6.2",
-    "oxfmt": "^0.28.0",
-    "oxlint": "^1.43.0",
-    "typescript": "^5.4.2",
-    "vite": "^5.1.4"
-  },
-  "contributes": {
-    "commands": [
-      {
-        "command": "atlassian.login",
-        "title": "Atlassian: Login"
-      },
-      {
-        "command": "atlassian.logout",
-        "title": "Atlassian: Logout"
-      },
-      {
-        "command": "atlassian.refresh",
-        "title": "Atlassian: Refresh Issues"
-      },
-      {
-        "command": "atlassian.openIssue",
-        "title": "Atlassian: Open Issue"
-      }
-    ],
-    "views": {
-      "explorer": [
-        {
-          "id": "atlassianIssues",
-          "name": "Atlassian Sprint"
-        }
-      ]
-    },
-    "viewsWelcome": [
-      {
-        "view": "atlassianIssues",
-        "contents": "Sign in to Atlassian to view your sprint issues.\\n[Sign in](command:atlassian.login)"
-      }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "atlassian.refresh",
-          "when": "view == atlassianIssues",
-          "group": "navigation"
-        },
-        {
-          "command": "atlassian.login",
-          "when": "view == atlassianIssues",
-          "group": "navigation"
-        },
-        {
-          "command": "atlassian.logout",
-          "when": "view == atlassianIssues",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "atlassian.openIssue",
-          "when": "view == atlassianIssues && viewItem == atlassianIssue",
-          "group": "inline"
-        }
-      ]
-    },
-    "configuration": {
-      "title": "Atlassian",
-      "properties": {
-        "atlassian.oauthClientId": {
-          "type": "string",
-          "default": "",
-          "description": "Atlassian OAuth 2.0 (3LO) client ID from developer.atlassian.com."
-        },
-        "atlassian.oauthClientSecret": {
-          "type": "string",
-          "default": "",
-          "description": "Atlassian OAuth 2.0 (3LO) client secret. Required for token exchange."
-        },
-        "atlassian.oauthScopes": {
-          "type": "string",
-          "default": "read:jira-work offline_access",
-          "description": "OAuth scopes to request."
-        },
-        "atlassian.oauthRedirectPort": {
-          "type": "number",
-          "default": 8765,
-          "description": "Local port used for OAuth callback. Add http://127.0.0.1:PORT/callback to your Atlassian OAuth app."
-        },
-        "atlassian.jql": {
-          "type": "string",
-          "default": "assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC",
-          "description": "JQL used to load sprint issues."
-        },
-        "atlassian.maxResults": {
-          "type": "number",
-          "default": 50,
-          "description": "Maximum number of issues to fetch per refresh."
-        },
-        "atlassian.webviewDevPath": {
-          "type": "string",
-          "default": "",
-          "description": "Optional local HTML path for live-refresh webview development. Changes to the file will reload the login panel."
-        },
-        "atlassian.webviewDevServerUrl": {
-          "type": "string",
-          "default": "",
-          "description": "Optional dev server URL (e.g. http://localhost:5173) for HMR webview development."
-        }
-      }
-    }
-  },
-  "activationEvents": [
-    "onCommand:atlassian.login",
-    "onCommand:atlassian.logout",
-    "onCommand:atlassian.refresh",
-    "onView:atlassianIssues"
-  ],
-  "engines": {
-    "vscode": "^1.86.0"
-  }
+	"name": "atlassian-sprint-view",
+	"displayName": "Atlassian Sprint Issues",
+	"version": "0.0.11",
+	"description": "Show your open sprint Jira issues in a Tree View.",
+	"categories": [
+		"Other"
+	],
+	"keywords": [
+		"atlassian",
+		"extension",
+		"issues",
+		"jira",
+		"sprint",
+		"vscode"
+	],
+	"homepage": "https://marketplace.visualstudio.com/items?itemName=albertyang.atlassian-sprint-view",
+	"bugs": {
+		"url": "https://github.com/thealbertyang/atlassian/issues"
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/thealbertyang/atlassian.git"
+	},
+	"publisher": "albertyang",
+	"main": "./out/extension/extension.js",
+	"workspaces": [
+		"src/webview"
+	],
+	"activationEvents": [
+		"onUri",
+		"onView:atlassianIssues",
+		"onCommand:atlassian.login",
+		"onCommand:atlassian.openApp",
+		"onCommand:atlassian.logout",
+		"onCommand:atlassian.refresh",
+		"onCommand:atlassian.openIssue",
+		"onCommand:atlassian.runDevWebview",
+		"onCommand:atlassian.restartExtensionHost",
+		"onCommand:atlassian.reloadWebviews",
+		"onCommand:atlassian.syncEnvToSettings",
+		"onCommand:atlassian.reinstallExtension"
+	],
+	"scripts": {
+		"dev": "bun run dev:ext",
+		"dev:ext": "bun run build:ext --watch",
+		"dev:webview": "bash ./scripts/dev-webview.sh",
+		"install:webview": "bun install --cwd src/webview",
+		"install:all": "bun install && bun install --cwd src/webview",
+		"build:ext": "bun build src/extension/extension.ts --outdir out/extension --format=cjs --target=node --external vscode --sourcemap",
+		"typecheck": "tsgo -p ./",
+		"typecheck:watch": "tsgo -watch -p ./",
+		"compile": "bun run typecheck",
+		"compile:watch": "bun run typecheck:watch",
+		"lint": "oxlint src/extension src/webview/src",
+		"format": "oxfmt -w src/extension src/webview/src",
+		"build:webview": "bash -lc 'cd src/webview && bun run build'",
+		"compile:webview": "bun run build:webview",
+		"build": "bun run build:ext && bun run build:webview",
+		"clean:old-modules": "bash -lc 'rm -rf node_modules/.old_modules-*'",
+		"package": "bun run clean:old-modules && NODE_OPTIONS=\"--require ./scripts/patch-os-cpus.cjs\" vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license --no-dependencies",
+		"install:ext": "bun run build && bun run package && code-insiders --uninstall-extension albertyang.atlassian-sprint-view 2>/dev/null; code-insiders --install-extension atlassian-sprint-view.vsix --force",
+		"publish": "bash -lc 'source .env.local 2>/dev/null; NODE_OPTIONS=\"--require ./scripts/patch-os-cpus.cjs\" vsce publish -p \"$VSCE_PAT\"'",
+		"vscode:prepublish": "NODE_OPTIONS= bun run build"
+	},
+	"dependencies": {
+		"@jsonrpc-rx/server": "^0.2.1",
+		"axios": "^1.6.7",
+		"node-html-parser": "^7.0.1"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.30",
+		"@types/vscode": "^1.86.0",
+		"@typescript/native-preview": "^7.0.0-dev.20260203.1",
+		"@vscode/vsce": "^3.6.2",
+		"oxfmt": "^0.28.0",
+		"oxlint": "^1.43.0",
+		"typescript": "^5.4.2",
+		"vite": "^7.3.1",
+		"vite-plugin-vscode-webview-hmr": "^1.0.1"
+	},
+	"contributes": {
+		"commands": [
+			{
+				"command": "atlassian.login",
+				"title": "Atlassian: Login",
+				"icon": "$(settings-gear)"
+			},
+		{
+			"command": "atlassian.openApp",
+			"title": "Atlassian: Open App",
+			"icon": "$(screen-full)"
+		},
+			{
+				"command": "atlassian.runDevWebview",
+				"title": "Atlassian: Run Webview Dev Server"
+			},
+			{
+				"command": "atlassian.restartExtensionHost",
+				"title": "Atlassian: Restart Extension Host"
+			},
+			{
+				"command": "atlassian.reloadWebviews",
+				"title": "Atlassian: Reload Webviews"
+			},
+			{
+				"command": "atlassian.syncEnvToSettings",
+				"title": "Atlassian: Sync .env.local to Settings"
+			},
+			{
+				"command": "atlassian.reinstallExtension",
+				"title": "Atlassian: Reinstall Extension"
+			},
+			{
+				"command": "atlassian.logout",
+				"title": "Atlassian: Logout"
+			},
+			{
+				"command": "atlassian.refresh",
+				"title": "Atlassian: Refresh Issues"
+			},
+		{
+			"command": "atlassian.openIssue",
+			"title": "Atlassian: Open Issue",
+			"icon": "$(go-to-file)"
+		}
+		],
+		"views": {
+			"explorer": [
+				{
+					"id": "atlassianIssues",
+					"name": "Atlassian Sprint"
+				}
+			]
+		},
+		"viewsWelcome": [
+			{
+				"view": "atlassianIssues",
+				"contents": "Sign in to Atlassian to view your sprint issues.\\n[Open App](command:atlassian.openApp)"
+			}
+		],
+		"menus": {
+			"view/title": [
+				{
+					"command": "atlassian.openApp",
+					"when": "view == atlassianIssues",
+					"group": "navigation",
+					"icon": "$(screen-full)"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "atlassian.openIssue",
+					"when": "view == atlassianIssues && viewItem == atlassianIssue",
+					"group": "inline",
+					"icon": "$(go-to-file)"
+				}
+			]
+		},
+		"configuration": {
+			"title": "Atlassian",
+			"properties": {
+				"atlassian.baseUrl": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Jira base URL (e.g. https://your-domain.atlassian.net). [Sync from .env.local](command:atlassian.syncEnvToSettings)"
+				},
+				"atlassian.jiraUrl": {
+					"type": "string",
+					"default": "",
+					"description": "Legacy Jira URL setting (use atlassian.baseUrl instead)."
+				},
+				"atlassian.email": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Atlassian account email. [Sync from .env.local](command:atlassian.syncEnvToSettings)"
+				},
+				"atlassian.apiToken": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Atlassian API token. Prefer storing this in .env.local or using the Connect flow. [Sync from .env.local](command:atlassian.syncEnvToSettings)"
+				},
+				"atlassian.oauthClientId": {
+					"type": "string",
+					"default": "",
+					"description": "Atlassian OAuth client ID."
+				},
+				"atlassian.oauthClientSecret": {
+					"type": "string",
+					"default": "",
+					"description": "Atlassian OAuth client secret."
+				},
+				"atlassian.oauthScopes": {
+					"type": "string",
+					"default": "read:jira-work offline_access",
+					"description": "Atlassian OAuth scopes."
+				},
+				"atlassian.oauthRedirectPort": {
+					"type": "number",
+					"default": 8765,
+					"description": "Local OAuth redirect port."
+				},
+				"atlassian.jql": {
+					"type": "string",
+					"default": "assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC",
+					"markdownDescription": "JQL used to load sprint issues. [Sync from .env.local](command:atlassian.syncEnvToSettings)"
+				},
+				"atlassian.maxResults": {
+					"type": "number",
+					"default": 50,
+					"description": "Maximum number of issues to fetch per refresh."
+				},
+				"atlassian.webviewDevPath": {
+					"type": "string",
+					"default": "",
+					"description": "Optional local HTML path for live-refresh webview development. Changes to the file will reload the login panel."
+				},
+				"atlassian.webviewDevServerUrl": {
+					"type": "string",
+					"default": "",
+					"description": "Optional dev server URL (e.g. http://localhost:5173) for HMR webview development."
+				}
+			}
+		}
+	},
+	"engines": {
+		"vscode": "^1.86.0"
+	}
 }

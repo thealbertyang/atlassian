@@ -2,23 +2,49 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "ext:watch",
+      "label": "compile",
       "type": "shell",
-      "command": "bun run watch",
-      "isBackground": true,
+      "command": "bun run compile",
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true,
+        "showReuseMessage": false
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
       "problemMatcher": []
     },
     {
-      "label": "webview:dev",
+      "label": "ensure-compiled",
       "type": "shell",
-      "command": "bun run dev:webview",
-      "isBackground": true,
+      "command": "bash ./scripts/ensure-compiled.sh",
+      "isBackground": false,
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true,
+        "showReuseMessage": false
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
       "problemMatcher": []
     },
     {
-      "label": "dev:hmr",
-      "dependsOn": ["ext:watch", "webview:dev"],
-      "dependsOrder": "parallel"
+      "label": "install:ext",
+      "type": "shell",
+      "command": "bun run install:ext",
+      "problemMatcher": []
+    },
+    {
+      "label": "dev:install",
+      "type": "shell",
+      "command": "bun run install:ext && bun run dev",
+      "isBackground": true,
+      "problemMatcher": []
     }
   ]
 }

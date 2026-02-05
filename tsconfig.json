@@ -10,5 +10,13 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "exclude": ["node_modules", ".vscode-test", "webview-ui", "webview"]
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "out",
+    "src/webview",
+    "scripts",
+    "src-archive-2026-02-04",
+    "webview-ui-archive-2026-02-04"
+  ]
 }

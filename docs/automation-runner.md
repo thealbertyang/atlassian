@@ -1,0 +1,101 @@
+# Automation Runner
+
+This is a repo-local runner that discovers `automation.toml` files, evaluates schedules, and executes tasks by type. It is separate from `~/.codex/automations` and can target any directory.
+
+**Why This Exists**
+
+- Keep automations versioned in your repo.
+- Support multiple automation types (command, runbook, prompt).
+- Avoid duplicating scripts by executing runbook code blocks directly.
+
+**Quick Start**
+
+```sh
+node scripts/automation-runner.mjs --root . --list
+node scripts/automation-runner.mjs --root . --once
+node scripts/automation-runner.mjs --root . --tick --interval 60
+```
+
+**Discovery Rules**
+
+- `automation.toml`
+- `*.automation.toml`
+
+**Supported Types**
+
+| Type | Description |
+| --- | --- |
+| `command` | Run a shell command |
+| `runbook` | Run a named block from a Markdown runbook |
+| `prompt` | Print a prompt (or run a configured runner command) |
+
+**Common Fields**
+
+```toml
+id = "triage"
+name = "Issues Triage"
+type = "runbook"
+status = "ACTIVE"
+rrule = "FREQ=HOURLY;INTERVAL=6;BYMINUTE=0"
+cwd = "/Users/albertyang/Developer"
+cwds = ["/Users/albertyang/Developer", "/Users/albertyang/Other"]
+```
+
+**Type: command**
+
+```toml
+type = "command"
+command = "bun run lint"
+cwd = "/Users/albertyang/Developer/repos/vscode/extensions/atlassian"
+```
+
+**Type: runbook**
+
+```toml
+type = "runbook"
+runbook = "docs/runbooks/automation-triage.md"
+block = "triage-refresh"
+cwd = "/Users/albertyang/Developer/repos/vscode/extensions/atlassian"
+```
+
+**Type: prompt**
+
+```toml
+type = "prompt"
+prompt = "Summarize issues and draft next actions."
+runner = "codex" # optional
+```
+
+**RRULE Support (Lite)**
+
+Supported fields:
+- `FREQ=HOURLY|DAILY|WEEKLY`
+- `INTERVAL`
+- `BYMINUTE`
+- `BYHOUR`
+- `BYDAY`
+
+Defaults:
+- HOURLY: minute 0
+- DAILY/WEEKLY: 09:00 local time
+
+**State Tracking**
+
+By default the runner stores last-run timestamps at:
+
+```
+.automation-runner/state.json
+```
+
+Override with:
+
+```sh
+node scripts/automation-runner.mjs --state /path/to/state.json
+```
+
+**Recommended Pattern**
+
+- Put automations in repo folders.
+- Run them in CI or locally with the runner.
+- Use `type=runbook` to avoid duplicate scripts.
+

@@ -2,6 +2,16 @@
 
 Shows your open sprint Jira issues in the Explorer view.
 
+## Overview
+
+Atlassian Sprint Issues is a VS Code extension that keeps your current sprint Jira issues visible in the Explorer view. It pairs a lightweight tree view with a webview panel for connection, issue drill‑downs, and future workflow views.
+
+Primary flows:
+
+1. Connect to Jira (API token or OAuth).
+2. View and refresh your sprint issues.
+3. Open an issue in the app or browser.
+
 ## Features
 
 - Tree view in Explorer with issues from the current open sprint assigned to you
@@ -10,34 +20,52 @@ Shows your open sprint Jira issues in the Explorer view.
 
 ## Setup
 
+Quick start:
+
+1. Run `Atlassian: Open App`.
+2. Choose API token or OAuth.
+3. Confirm the connection and refresh the tree.
+
 ### API Token
 
-1. Run `Atlassian: Login` from the Command Palette.
+1. Run `Atlassian: Open App` from the Command Palette.
 2. Enter your Jira site URL, email, and API token.
 
 ### OAuth 2.0 (3LO)
 
 1. Create an OAuth 2.0 (3LO) app in the Atlassian developer console.
 2. Add a redirect URL in your app that matches the local callback, for example: `http://127.0.0.1:8765/callback`.
-3. In VS Code settings, configure:
+3. In VS Code settings (or `.env.local`), configure:
    - `atlassian.oauthClientId`
    - `atlassian.oauthClientSecret`
    - `atlassian.oauthRedirectPort` (if you want a different port)
-4. Run `Atlassian: Login` and choose OAuth.
+4. Run `Atlassian: Open App` and choose OAuth.
+
+If you use `.env.local`, run `Atlassian: Sync .env.local to Settings` to copy values into workspace settings.
 
 ## Settings
 
-- `atlassian.jql`: JQL used to fetch issues. Default: `assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC`
-- `atlassian.maxResults`: Max issues returned per refresh.
-- `atlassian.oauthClientId`: OAuth client ID.
-- `atlassian.oauthClientSecret`: OAuth client secret.
-- `atlassian.oauthScopes`: OAuth scopes (default: `read:jira-work offline_access`).
-- `atlassian.oauthRedirectPort`: Local port for OAuth callback.
+| Setting | Purpose | Default | Notes |
+| --- | --- | --- | --- |
+| `atlassian.baseUrl` | Jira site base URL | `""` | Example: `https://your-domain.atlassian.net` |
+| `atlassian.jiraUrl` | Legacy Jira URL | `""` | Prefer `atlassian.baseUrl` |
+| `atlassian.email` | Atlassian account email | `""` | Used for API token auth |
+| `atlassian.apiToken` | Atlassian API token | `""` | Prefer `.env.local` or OAuth |
+| `atlassian.jql` | JQL used to fetch issues | `assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC` | User intent only |
+| `atlassian.maxResults` | Max issues per refresh | `50` | Keep small for performance |
+| `atlassian.oauthClientId` | OAuth client ID | `""` | Required for OAuth |
+| `atlassian.oauthClientSecret` | OAuth client secret | `""` | Required for OAuth |
+| `atlassian.oauthScopes` | OAuth scopes | `read:jira-work offline_access` | Keep minimal |
+| `atlassian.oauthRedirectPort` | OAuth callback port | `8765` | Local only |
+| `atlassian.webviewDevPath` | Local HTML path for webview dev | `""` | Live reloads on file change |
+| `atlassian.webviewDevServerUrl` | Dev server URL for HMR | `""` | Example: `http://localhost:5173` |
 
 ### Environment Overrides
 
-You can supply OAuth settings via `.env.local` (or `.env`) in any workspace folder.
-The extension loads these and will also resolve `${env:VAR}` placeholders in settings.
+You can supply settings via `.env.local` (or `.env`) in any workspace folder.
+The extension loads these and will also resolve `${env:VAR}` placeholders in settings. Use `Atlassian: Sync .env.local to Settings` to copy values into workspace settings.
+
+OAuth env vars:
 
 - `ATLASSIAN_OAUTH_CLIENT_ID`
 - `ATLASSIAN_OAUTH_CLIENT_SECRET`
@@ -46,10 +74,37 @@ The extension loads these and will also resolve `${env:VAR}` placeholders in set
 
 API token settings can also be provided via `.env.local` (or `.env`):
 
+API token env vars:
+
 - `JIRA_URL` (e.g., `https://your-domain.atlassian.net`)
+- `ATLASSIAN_BASE_URL`
 - `JIRA_USER_EMAIL`
+- `ATLASSIAN_EMAIL`
 - `JIRA_API_TOKEN`
+- `ATLASSIAN_API_TOKEN`
 - `JIRA_JQL` (optional override for the JQL query)
+
+Webview dev env vars:
+
+- `ATLASSIAN_WEBVIEW_DEV_PATH`
+- `ATLASSIAN_WEBVIEW_DEV_SERVER_URL`
+
+## Dev Design
+
+The extension follows a predictable flow: user intent or system events are normalized into actions, the extension host produces effects, then storage and UI updates follow. The webview is a renderer and never writes storage directly.
+
+Design rules we follow:
+
+1. Settings represent user intent, not cache.
+2. Secrets live in `context.secrets`.
+3. Large data goes in `storageUri` or `globalStorageUri`.
+4. Commands stay minimal and high‑value.
+
+Related docs:
+
+- `docs/routing-matrix.md`
+- `docs/external-app-matrix.md`
+- `docs/main-app-usage.md`
 
 ### Webview Dev (Live Refresh)
 
@@ -72,7 +127,7 @@ For a richer UI, you can run a local dev server and have the webview load it:
 - `bun run dev:webview`
 
 Then reopen `Atlassian: Login`. The webview will load the dev server and get HMR.
-The dev server auto-picks a free port and writes `.webview-dev-url` so the
+The dev server runs on `http://localhost:5173` by default so the
 extension can find it.
 
 #### HTTPS (optional)
@@ -81,12 +136,12 @@ If you want HTTPS locally (some browsers auto-upgrade), run:
 
 - `bun run dev:webview:https`
 
-This generates a self-signed cert in `webview-ui/.certs` and starts Vite at
+This generates a self-signed cert in `src/webview/.certs` and starts Vite at
 `https://localhost:5173`. You may need to trust the cert in Keychain.
 
 ### Webview Build (Production)
 
-For Marketplace builds, the extension will load `webview-ui/dist/index.html`.
+For Marketplace builds, the extension will load `out/webview/index.html`.
 You can generate it locally with:
 
 - `bun run build:webview`
@@ -115,49 +170,31 @@ Use the provided launch config:
 - `Atlassian: Refresh Issues`
 - `Atlassian: Open Issue`
 
+## Docs
+
+- `docs/routing-matrix.md`
+- `docs/external-app-matrix.md`
+- `docs/main-app-usage.md`
+- `docs/engineer-work-matrix.md`
+- `docs/lifecycle-ui.md`
+- `docs/project-management-matrix.md`
+- `docs/reminder-ui.md`
+- `docs/automation-runner.md`
+
 ## Development (Bun)
 
 - `bun install`
-- `bun run compile`
-- `bun run lint`
-- `bun run fmt`
-- `bun run dev` opens the login panel, sets the webview dev path (if not set),
-  and runs `tsgo --watch`.
+- `bun run dev` starts the TypeScript watch build for the extension.
 - Press `F5` to launch an Extension Development Host.
+  The webview dev server starts automatically in development mode.
 
 ## Install (Code - Insiders)
 
-- `bun run install:extension:local` installs the local VSIX and attempts to reload the window via AppleScript.
-  `bun run install:extension` is an alias for `install:extension:local`.
-- `bun run install:extension:market` installs the Marketplace build.
-  If the reload step fails, grant Accessibility permissions to your terminal, or run `Developer: Reload Window` manually.
+- `bun run install:ext` builds, packages, and installs the local VSIX.
 
 ## Publish
 
-- `bun run publish` publishes the current version using `VSCE_PAT` from `.env.local`, then
-  waits for Marketplace propagation and installs the new version locally.
-  It installs the exact version to avoid downgrades while the CDN propagates.
-- `bun run publish:patch` bumps patch, publishes, installs from Marketplace, then tags the release.
-- `bun run publish:minor` bumps minor, publishes, installs from Marketplace, then tags the release.
-- `bun run publish:major` bumps major, publishes, installs from Marketplace, then tags the release.
-- `bun run release:patch` does the full flow: bump patch, lint/format/compile, show recent commits,
-  prompt for a commit message, commit + push, publish + install, then tag. Output is also written
-  to `.release.log`. If `gh` is installed, it shows GitHub Actions status.
-- `bun run release:minor` same as above for minor versions.
-- `bun run release:major` same as above for major versions.
-- `bun run release:status` shows the latest GitHub Actions release status.
-
-### Reliable Marketplace Install (launchd)
-
-If Marketplace propagation is slow, you can install a launchd helper that polls
-for the new version and installs it as soon as it appears.
-
-- `bun run launchd:install` installs a LaunchAgent that checks every 2 minutes.
-- `bun run launchd:uninstall` removes the LaunchAgent.
-
-Logs are written to `~/Library/Logs/atlassian-sprint-view-marketplace.log`.
-
-- `bun run release:tag` creates and pushes a git tag for the current version.
+- `bun run publish` publishes the current version using `VSCE_PAT` from `.env.local`.
 
 ## CI/CD
 

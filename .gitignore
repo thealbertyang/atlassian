@@ -8,6 +8,15 @@ webview-ui/**/*.js
 webview-ui/**/*.js.map
 webview-ui/.certs/
 .webview-dev-url
+out/
+out/**
+src/webview/src/**/*.js
+src/webview/src/**/*.js.map
+src/webview/src/routeTree.gen.ts
+src/webview/.tanstack/
+src/webview/.tanstack/**
+src/webview/Users/
+src/webview/Users/**
 
 # macOS
 .DS_Store
