@@ -1,4 +1,5 @@
 import { createAuthHandlers } from "./auth";
+import { createAutomationHandlers } from "./automations";
 import { createDocsHandlers } from "./docs";
 import { createDevHandlers } from "./dev";
 import { createHttpHandlers } from "./http";
@@ -19,6 +20,7 @@ export const getHandlers = (dependencies: HandlerDependencies) => ({
   ...createSettingsHandlers(dependencies),
   ...createDocsHandlers(dependencies),
   ...createDevHandlers(dependencies),
+  ...createAutomationHandlers(dependencies),
 });
 
 export type HandlersType = ReturnType<typeof getHandlers>;

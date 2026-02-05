@@ -1,3 +1,4 @@
+import type { AutomationRun, AutomationsIndex } from "@shared/automations-contract";
 import type { DocContent, DocsIndex } from "@shared/docs-contract";
 
 export type ConfigSource =
@@ -77,4 +78,6 @@ export type HandlersType = {
   runDevWebview: () => Promise<void>;
   restartExtensionHost: () => Promise<void>;
   reloadWebviews: () => Promise<void>;
+  getAutomations: () => Promise<AutomationsIndex>;
+  getAutomationRuns: (automationId: string) => Promise<AutomationRun[]>;
 };
