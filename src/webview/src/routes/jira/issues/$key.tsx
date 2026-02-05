@@ -140,24 +140,25 @@ function JiraIssuePage() {
             <div className="note">
               Share this view: <code>{deepLinkUrl}</code>
             </div>
-            <div className="actions" style={{ justifyContent: "center", marginTop: "1rem" }}>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={refreshIssue}
-                disabled={!isWebview || issueLoading}
-                title="Refresh issue"
-                aria-label="Refresh issue"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
-                </svg>
-              </button>
-            </div>
           </>
         ) : (
           <p className="note">Select an issue to load details.</p>
         )}
+
+        <div className="refresh-fab">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={refreshIssue}
+            disabled={!isWebview || issueLoading}
+            title="Refresh issue"
+            aria-label="Refresh issue"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div className="card">
         <h2>Issue actions</h2>
