@@ -71,10 +71,13 @@ export const createSettingsHandlers = ({ context, storage, client }: SettingsDep
       return;
     }
 
+    const target =
+      workspace.workspaceFolders && workspace.workspaceFolders.length > 0
+        ? ConfigurationTarget.Workspace
+        : ConfigurationTarget.Global;
+
     await Promise.all(
-      updates.map(({ key, value }) =>
-        storage.updateSetting(key, value, ConfigurationTarget.WorkspaceFolder, workspaceFolder.uri),
-      ),
+      updates.map(({ key, value }) => storage.updateSetting(key, value, target)),
     );
 
     if (baseUrl && email && apiToken) {
