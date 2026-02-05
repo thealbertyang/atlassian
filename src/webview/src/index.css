@@ -1,0 +1,87 @@
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  color: var(--vscode-foreground, #1f2328);
+  background:
+    radial-gradient(circle at 18% -8%, rgba(89, 140, 255, 0.12), transparent 55%),
+    radial-gradient(circle at 82% 0%, rgba(255, 196, 108, 0.08), transparent 50%),
+    var(--vscode-editor-background, #ffffff);
+  margin: 0;
+  padding: 24px;
+}
+
+#root {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+h2 {
+  font-size: 15px;
+  margin: 0 0 10px 0;
+}
+
+label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground, #57606a);
+}
+
+input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--vscode-input-border, #d0d7de);
+  background: var(--vscode-input-background, #ffffff);
+  color: var(--vscode-input-foreground, #1f2328);
+}
+
+button {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: var(--vscode-button-background, #2c74d3);
+  color: var(--vscode-button-foreground, #ffffff);
+  font-weight: 600;
+}
+
+button.secondary {
+  background: var(--vscode-button-secondaryBackground, #4f5b66);
+  color: var(--vscode-button-secondaryForeground, #ffffff);
+}
+
+button.danger {
+  background: var(--vscode-inputValidation-errorBackground, #d73a49);
+  color: #ffffff;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  background: var(--vscode-textCodeBlock-background, #f0f0f0);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+a {
+  color: var(--vscode-textLink-foreground, #2c74d3);
+}
+
+a:hover {
+  color: var(--vscode-textLink-activeForeground, #1a5fb4);
+}
