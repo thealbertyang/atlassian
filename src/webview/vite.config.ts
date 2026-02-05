@@ -11,6 +11,7 @@ export default defineConfig(({ command }) => {
   return {
     root: resolve(__dirname),
     appType: "spa",
+    base: isServe ? "/" : "./",
     environments: {
       client: {},
     },
