@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type MutableRefObject } from "react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import mermaidScriptUrl from "mermaid/dist/mermaid.min.js?url";
+import mermaid from "mermaid";
 import type { DocContent, DocEntry, DocsIndex, DocGroup } from "@shared/docs-contract";
 import { useHandlers } from "../../hooks/use-handlers";
 import { useAppContext } from "../../contexts/app-context";
@@ -75,55 +75,6 @@ const scrollToAnchor = (anchor: string, container?: HTMLElement | null) => {
   target.scrollIntoView({ behavior: "smooth", block: "start" });
 };
 
-let mermaidScriptPromise: Promise<void> | null = null;
-
-const resolveWebviewAssetUrl = (value: string): string => {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  if (
-    trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://") ||
-    trimmed.startsWith("vscode-webview://") ||
-    trimmed.startsWith("data:") ||
-    trimmed.startsWith("blob:")
-  ) {
-    return trimmed;
-  }
-  const base = (window as { __webview_uri__?: string }).__webview_uri__?.replace(/\/$/, "");
-  if (!base) {
-    return trimmed;
-  }
-  const normalized = trimmed.startsWith("./")
-    ? trimmed.slice(2)
-    : trimmed.startsWith("/")
-      ? trimmed.slice(1)
-      : trimmed;
-  return `${base}/${normalized}`;
-};
-
-const loadMermaid = async () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-  const existing = (window as { mermaid?: unknown }).mermaid;
-  if (existing) {
-    return;
-  }
-  if (!mermaidScriptPromise) {
-    mermaidScriptPromise = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = resolveWebviewAssetUrl(mermaidScriptUrl);
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load Mermaid runtime."));
-      document.head.appendChild(script);
-    });
-  }
-  await mermaidScriptPromise;
-};
-
 const renderMermaid = async (
   container: HTMLElement | null,
   initializedRef: MutableRefObject<boolean>,
@@ -139,9 +90,6 @@ const renderMermaid = async (
   }
 
   try {
-    await loadMermaid();
-    const mermaid = (window as { mermaid?: { initialize: (config: unknown) => void; run: (opts: unknown) => Promise<void> } })
-      .mermaid;
     if (!mermaid) {
       return;
     }
@@ -176,6 +124,8 @@ const renderMermaid = async (
 function DocsPage() {
   const handlers = useHandlers();
   const { isWebview, openSettings } = useAppContext();
+  const navigate = useNavigate();
+  const location = useRouterState({ select: (state) => state.location });
   const [index, setIndex] = useState<DocsIndex | null>(null);
   const [indexLoading, setIndexLoading] = useState(false);
   const [indexError, setIndexError] = useState("");
@@ -188,6 +138,8 @@ function DocsPage() {
   const mermaidReadyRef = useRef(false);
 
   const entries = index?.entries ?? [];
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const docParam = searchParams.get("doc") ?? "";
 
   const groupedEntries = useMemo(() => {
     const grouped: Record<DocGroup, DocEntry[]> = { docs: [], runbooks: [] };
@@ -231,13 +183,20 @@ function DocsPage() {
   }, [handlers, isWebview]);
 
   useEffect(() => {
-    if (!index || activeId) {
+    if (!index) {
       return;
     }
-    if (index.entries.length > 0) {
+    if (docParam) {
+      const match = index.entries.find((entry) => entry.id === docParam);
+      if (match && match.id !== activeId) {
+        setActiveId(match.id);
+        return;
+      }
+    }
+    if (!activeId && index.entries.length > 0) {
       setActiveId(index.entries[0].id);
     }
-  }, [index, activeId]);
+  }, [index, activeId, docParam]);
 
   useEffect(() => {
     if (!isWebview || !activeId) {
@@ -298,6 +257,22 @@ function DocsPage() {
   useEffect(() => {
     void renderMermaid(markdownRef.current, mermaidReadyRef);
   }, [markdownHtml]);
+
+  useEffect(() => {
+    if (!activeId) {
+      return;
+    }
+    if (docParam === activeId) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.set("doc", activeId);
+    navigate({
+      to: "/docs",
+      search: Object.fromEntries(next.entries()),
+      replace: true,
+    });
+  }, [activeId, docParam, navigate, searchParams]);
 
   const sourceLabel = index?.source
     ? index.source === "settings"

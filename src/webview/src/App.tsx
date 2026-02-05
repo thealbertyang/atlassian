@@ -29,6 +29,18 @@ type Breadcrumb = {
   path: string;
 };
 
+type PersistedRouteState = {
+  path?: string;
+  pathname?: string;
+  query?: Record<string, string>;
+  search?: Record<string, string>;
+  timestamp?: number;
+};
+
+type PersistedWebviewState = {
+  lastRoute?: PersistedRouteState;
+};
+
 const EMPTY_STATE: WebviewState = {
   baseUrl: "",
   email: "",
@@ -67,12 +79,33 @@ const toSearchParams = (value: unknown): URLSearchParams => {
   return new URLSearchParams();
 };
 
+const readPersistedRoute = (state: unknown) => {
+  if (!state || typeof state !== "object") {
+    return null;
+  }
+  const persisted = (state as PersistedWebviewState).lastRoute;
+  if (!persisted || typeof persisted !== "object") {
+    return null;
+  }
+  const rawPath = persisted.path ?? persisted.pathname;
+  if (!rawPath) {
+    return null;
+  }
+  const queryParams = toSearchParams(persisted.query ?? persisted.search ?? {});
+  return {
+    path: normalizeRoutePath(String(rawPath)),
+    query: Object.fromEntries(queryParams.entries()) as Record<string, string>,
+    search: queryParams.toString(),
+  };
+};
+
 function App({ children }: AppProps) {
   const handlers = useHandlers();
   const navigate = useNavigate();
   const location = useRouterState({ select: (state) => state.location });
   const ipcRef = useRef<ReturnType<typeof createWebviewIpc> | null>(null);
   const initialRouteApplied = useRef(false);
+  const initialRouteTargetRef = useRef<{ path: string; search: string } | null>(null);
 
   const [state, setState] = useState<WebviewState>(EMPTY_STATE);
   const [form, setForm] = useState<FormState>({
@@ -145,14 +178,34 @@ function App({ children }: AppProps) {
       return;
     }
     const hint = (window as any).__atlassianRoute as RouteHint | undefined;
-    if (!hint) {
+    if (hint) {
+      initialRouteApplied.current = true;
+      const target = normalizeRoutePath(routeHintToPath(hint));
+      const queryParams = toSearchParams(hint.query ?? {});
+      initialRouteTargetRef.current = {
+        path: target,
+        search: queryParams.toString(),
+      };
+      navigate({
+        to: target,
+        search: Object.fromEntries(queryParams.entries()),
+        replace: true,
+      });
+      return;
+    }
+    const persistedRoute = readPersistedRoute(getVsCodeApi().getState());
+    if (!persistedRoute) {
+      initialRouteApplied.current = true;
       return;
     }
     initialRouteApplied.current = true;
-    const target = normalizeRoutePath(routeHintToPath(hint));
+    initialRouteTargetRef.current = {
+      path: persistedRoute.path,
+      search: persistedRoute.search,
+    };
     navigate({
-      to: target,
-      search: hint.query ?? {},
+      to: persistedRoute.path,
+      search: persistedRoute.query,
       replace: true,
     });
   }, [navigate]);
@@ -194,6 +247,32 @@ function App({ children }: AppProps) {
     ipcRef.current.sendEvent(IPC_EVENTS.ROUTE_CHANGED, {
       path: pathname,
       query: Object.fromEntries(searchParams.entries()),
+    });
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    if (!isWebview) {
+      return;
+    }
+    const target = initialRouteTargetRef.current;
+    const currentSearch = searchParams.toString();
+    if (target) {
+      if (target.path !== pathname || target.search !== currentSearch) {
+        return;
+      }
+      initialRouteTargetRef.current = null;
+    }
+    const vscodeApi = getVsCodeApi();
+    const previousState = vscodeApi.getState();
+    const baseState =
+      previousState && typeof previousState === "object" ? previousState : {};
+    vscodeApi.setState({
+      ...(baseState as Record<string, unknown>),
+      lastRoute: {
+        path: pathname,
+        query: Object.fromEntries(searchParams.entries()),
+        timestamp: Date.now(),
+      },
     });
   }, [pathname, searchParams]);
 
