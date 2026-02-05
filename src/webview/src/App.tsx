@@ -534,6 +534,16 @@ function App({ children }: AppProps) {
           </div>
         </header>
 
+        <section className="deep-link-bar" aria-label="Deep link">
+          <div>
+            <div className="eyebrow">Deep link</div>
+            <div className="deep-link-url">{deepLinkUrl}</div>
+          </div>
+          <button className="secondary" onClick={copyDeepLink} disabled={!isWebview}>
+            Copy link
+          </button>
+        </section>
+
         <nav className="tabs">
           {tabs.map((tab) => (
             <button
