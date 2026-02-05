@@ -13,7 +13,7 @@ First time setup or credentials have expired.
 All required external systems are connected and verified.
 
 **Prerequisites**
-- API credentials or OAuth access
+- API credentials
 - Workspace settings ready
 
 **Exact Commands**

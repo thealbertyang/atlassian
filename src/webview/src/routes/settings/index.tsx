@@ -11,14 +11,8 @@ export const Route = createFileRoute("/settings/")({
 
 function SettingsPage() {
   const { state, status, openSettings, isWebview, loading } = useAppContext();
-  const authLabel =
-    state.authType === "oauth" ? "OAuth 2.0" : state.authType === "apiToken" ? "API token" : "Not set";
-  const tokenStorage =
-    state.authType === "apiToken"
-      ? state.hasStoredToken
-        ? "Stored in SecretStorage"
-        : "Not stored"
-      : "Managed by OAuth";
+  const authLabel = state.authType === "apiToken" ? "API token" : "Not set";
+  const tokenStorage = state.hasStoredToken ? "Stored in SecretStorage" : "Not stored";
 
   return (
     <section className="grid">

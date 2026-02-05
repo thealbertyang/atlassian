@@ -3,13 +3,6 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { MASKED_SECRET } from "../../../constants";
 
-export interface OAuthConfig {
-  clientId: string;
-  clientSecret: string;
-  scopes: string;
-  redirectPort: number;
-}
-
 export interface ApiTokenConfig {
   baseUrl: string;
   email: string;
@@ -42,29 +35,12 @@ export function getWebviewDevPath(): string {
   return (fromConfig || fromEnv).trim();
 }
 
-export function getOAuthConfig(): OAuthConfig {
+export function getDocsPath(): string {
   const config = vscode.workspace.getConfiguration("atlassian");
   const env = getEnvMap();
-
-  const clientId = getConfigString(config, "oauthClientId", "ATLASSIAN_OAUTH_CLIENT_ID", env);
-  const clientSecret = getConfigString(
-    config,
-    "oauthClientSecret",
-    "ATLASSIAN_OAUTH_CLIENT_SECRET",
-    env,
-  );
-  const scopes =
-    getConfigString(config, "oauthScopes", "ATLASSIAN_OAUTH_SCOPES", env) ||
-    "read:jira-work offline_access";
-  const redirectPort = getConfigNumber(
-    config,
-    "oauthRedirectPort",
-    "ATLASSIAN_OAUTH_REDIRECT_PORT",
-    env,
-    8765,
-  );
-
-  return { clientId, clientSecret, scopes, redirectPort };
+  const fromConfig = resolveEnvPlaceholders(String(config.get("docsPath") || ""), env);
+  const fromEnv = getEnvValue(env, "ATLASSIAN_DOCS_PATH");
+  return (fromConfig || fromEnv).trim();
 }
 
 export function getApiTokenConfig(): ApiTokenConfig {
@@ -187,58 +163,6 @@ export function getApiTokenConfigSource(): ConfigSource {
   }
 
   return "mixed";
-}
-
-function getConfigString(
-  config: vscode.WorkspaceConfiguration,
-  key: string,
-  envKey: string,
-  env: Record<string, string>,
-): string {
-  const inspected = config.inspect<string>(key);
-  const currentValue =
-    inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
-  const resolvedCurrent = resolveEnvPlaceholders(currentValue, env).trim();
-  if (resolvedCurrent) {
-    return resolvedCurrent;
-  }
-
-  const envValue = env[envKey]?.trim();
-  if (envValue) {
-    return envValue;
-  }
-
-  const defaultValue = resolveEnvPlaceholders(inspected?.defaultValue, env).trim();
-  return defaultValue;
-}
-
-function getConfigNumber(
-  config: vscode.WorkspaceConfiguration,
-  key: string,
-  envKey: string,
-  env: Record<string, string>,
-  fallback: number,
-): number {
-  const inspected = config.inspect<number>(key);
-  const currentValue =
-    inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
-  if (typeof currentValue === "number") {
-    return currentValue;
-  }
-
-  const envValue = env[envKey];
-  if (envValue) {
-    const parsed = Number(envValue);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  if (typeof inspected?.defaultValue === "number") {
-    return inspected.defaultValue;
-  }
-
-  return fallback;
 }
 
 function resolveEnvPlaceholders(value: string | undefined, env: Record<string, string>): string {

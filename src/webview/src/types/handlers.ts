@@ -1,3 +1,5 @@
+import type { DocContent, DocsIndex } from "@shared/docs-contract";
+
 export type ConfigSource =
   | "env.local"
   | "env"
@@ -11,7 +13,7 @@ export type WebviewState = {
   email: string;
   apiTokenConfigured: boolean;
   configSource: ConfigSource;
-  authType?: "apiToken" | "oauth" | "none";
+  authType?: "apiToken" | "none";
   hasStoredToken?: boolean;
   devMode?: boolean;
   extensionId?: string;
@@ -63,6 +65,8 @@ export type HandlersType = {
   onDidOpenTextDocument: (observer: ObservableHandler<TextDocumentLike>) => Promise<() => void>;
   getState: () => Promise<WebviewState>;
   getIssue: (key: string) => Promise<JiraIssueDetails | null>;
+  getDocsIndex: () => Promise<DocsIndex>;
+  getDocContent: (id: string) => Promise<DocContent | null>;
   saveApiToken: (baseUrl: string, email: string, apiToken: string) => Promise<void>;
   disconnect: () => Promise<void>;
   openSettings: () => Promise<void>;

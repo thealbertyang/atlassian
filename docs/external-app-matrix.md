@@ -26,7 +26,7 @@ flowchart LR
 | Issue | `ABC-123` | Core entity shown in the tree and webview |
 | Project | `ABC` | Used for filtering and display |
 | User | `currentUser()` | Used in JQL and display |
-| Auth | API token / OAuth | Determines headers and endpoints |
+| Auth | API token | Determines headers and endpoints |
 | Query | JQL string | Drives list results |
 
 **Action Taxonomy**
@@ -45,7 +45,6 @@ flowchart LR
 | Domain | Action | User Value | API Call | Auth | Storage Touch | Webview Surface | Command? |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Auth | Connect (API token) | High | none | API token | secrets + settings | Setup | Yes |
-| Auth | Connect (OAuth) | High | OAuth flow | OAuth | secrets + state | Setup | Yes |
 | Issues | List sprint issues | High | `search/jql` | token | settings + cache | Overview | No |
 | Issues | Open issue | High | `issue/{key}` | token | none | Jira detail | Yes |
 | Issues | Open in browser | Medium | `issue/{key}` | token | none | Jira detail | No |
@@ -101,7 +100,6 @@ score = (frequency * 3) + (value * 3) - (discoverability * 2) - (risk * 2) - (la
 | Data | Storage | Notes |
 | --- | --- | --- |
 | Tokens | `context.secrets` | Always |
-| Auth metadata | `context.globalState` | `authType`, OAuth metadata |
+| Connection metadata | `context.globalState` | `baseUrl`, `email` |
 | JQL, max results | Settings | User intent |
 | Cached results | `storageUri` | Optional future cache |
-

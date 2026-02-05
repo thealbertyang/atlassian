@@ -8,14 +8,14 @@ Atlassian Sprint Issues is a VS Code extension that keeps your current sprint Ji
 
 Primary flows:
 
-1. Connect to Jira (API token or OAuth).
+1. Connect to Jira with an API token.
 2. View and refresh your sprint issues.
 3. Open an issue in the app or browser.
 
 ## Features
 
 - Tree view in Explorer with issues from the current open sprint assigned to you
-- Login via Atlassian OAuth 2.0 (3LO) or API token
+- Login via Atlassian API token
 - Refresh and open issue commands
 
 ## Setup
@@ -23,23 +23,13 @@ Primary flows:
 Quick start:
 
 1. Run `Atlassian: Open App`.
-2. Choose API token or OAuth.
+2. Enter your Jira URL, email, and API token.
 3. Confirm the connection and refresh the tree.
 
 ### API Token
 
 1. Run `Atlassian: Open App` from the Command Palette.
 2. Enter your Jira site URL, email, and API token.
-
-### OAuth 2.0 (3LO)
-
-1. Create an OAuth 2.0 (3LO) app in the Atlassian developer console.
-2. Add a redirect URL in your app that matches the local callback, for example: `http://127.0.0.1:8765/callback`.
-3. In VS Code settings (or `.env.local`), configure:
-   - `atlassian.oauthClientId`
-   - `atlassian.oauthClientSecret`
-   - `atlassian.oauthRedirectPort` (if you want a different port)
-4. Run `Atlassian: Open App` and choose OAuth.
 
 If you use `.env.local`, run `Atlassian: Sync .env.local to Settings` to copy values into workspace settings.
 
@@ -50,13 +40,9 @@ If you use `.env.local`, run `Atlassian: Sync .env.local to Settings` to copy va
 | `atlassian.baseUrl` | Jira site base URL | `""` | Example: `https://your-domain.atlassian.net` |
 | `atlassian.jiraUrl` | Legacy Jira URL | `""` | Prefer `atlassian.baseUrl` |
 | `atlassian.email` | Atlassian account email | `""` | Used for API token auth |
-| `atlassian.apiToken` | Atlassian API token | `""` | Prefer `.env.local` or OAuth |
+| `atlassian.apiToken` | Atlassian API token | `""` | Prefer `.env.local` |
 | `atlassian.jql` | JQL used to fetch issues | `assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC` | User intent only |
 | `atlassian.maxResults` | Max issues per refresh | `50` | Keep small for performance |
-| `atlassian.oauthClientId` | OAuth client ID | `""` | Required for OAuth |
-| `atlassian.oauthClientSecret` | OAuth client secret | `""` | Required for OAuth |
-| `atlassian.oauthScopes` | OAuth scopes | `read:jira-work offline_access` | Keep minimal |
-| `atlassian.oauthRedirectPort` | OAuth callback port | `8765` | Local only |
 | `atlassian.webviewDevPath` | Local HTML path for webview dev | `""` | Live reloads on file change |
 | `atlassian.webviewDevServerUrl` | Dev server URL for HMR | `""` | Example: `http://localhost:5173` |
 
@@ -64,13 +50,6 @@ If you use `.env.local`, run `Atlassian: Sync .env.local to Settings` to copy va
 
 You can supply settings via `.env.local` (or `.env`) in any workspace folder.
 The extension loads these and will also resolve `${env:VAR}` placeholders in settings. Use `Atlassian: Sync .env.local to Settings` to copy values into workspace settings.
-
-OAuth env vars:
-
-- `ATLASSIAN_OAUTH_CLIENT_ID`
-- `ATLASSIAN_OAUTH_CLIENT_SECRET`
-- `ATLASSIAN_OAUTH_SCOPES`
-- `ATLASSIAN_OAUTH_REDIRECT_PORT`
 
 API token settings can also be provided via `.env.local` (or `.env`):
 

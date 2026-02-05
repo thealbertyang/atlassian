@@ -58,23 +58,8 @@ export const createSettingsHandlers = ({ context, storage, client }: SettingsDep
     if (envData.ATLASSIAN_WEBVIEW_DEV_PATH) {
       updates.push({ key: "webviewDevPath", value: envData.ATLASSIAN_WEBVIEW_DEV_PATH });
     }
-    if (envData.ATLASSIAN_OAUTH_CLIENT_ID) {
-      updates.push({ key: "oauthClientId", value: envData.ATLASSIAN_OAUTH_CLIENT_ID });
-    }
-    if (envData.ATLASSIAN_OAUTH_CLIENT_SECRET) {
-      updates.push({
-        key: "oauthClientSecret",
-        value: envData.ATLASSIAN_OAUTH_CLIENT_SECRET,
-      });
-    }
-    if (envData.ATLASSIAN_OAUTH_SCOPES) {
-      updates.push({ key: "oauthScopes", value: envData.ATLASSIAN_OAUTH_SCOPES });
-    }
-    if (envData.ATLASSIAN_OAUTH_REDIRECT_PORT) {
-      const parsed = Number(envData.ATLASSIAN_OAUTH_REDIRECT_PORT);
-      if (Number.isFinite(parsed)) {
-        updates.push({ key: "oauthRedirectPort", value: parsed });
-      }
+    if (envData.ATLASSIAN_DOCS_PATH) {
+      updates.push({ key: "docsPath", value: envData.ATLASSIAN_DOCS_PATH });
     }
 
     if (updates.length === 0) {

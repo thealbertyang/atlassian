@@ -93,8 +93,8 @@ Every IPC message includes `type`, `payload`, and `traceId`.
 | Data Type | Where It Lives | API | Sync | Example |
 | --- | --- | --- | --- | --- |
 | User config | Settings | `workspace.getConfiguration()` | Yes | `baseUrl`, `jql`, `maxResults` |
-| Secrets | Secret store | `context.secrets` | No | API token, OAuth access/refresh |
-| Auth metadata | Global state | `context.globalState` | Optional | `authType`, `expiresAt`, `cloudId` |
+| Secrets | Secret store | `context.secrets` | No | API token |
+| Auth metadata | Global state | `context.globalState` | Optional | `baseUrl`, `email` |
 | Workspace cache | Workspace storage | `context.storageUri` | No | per-workspace issue cache |
 | Global cache | Global storage | `context.globalStorageUri` | No | shared cache |
 | Small state | Global or workspace state | `globalState` / `workspaceState` | Optional / No | reopen-after-restart |
@@ -141,7 +141,7 @@ We use one wrapper to keep persistence consistent and host-safe.
 | Commands | `src/extension/extension.ts` | All public actions wired here |
 | Webview IPC | `src/webview/src/ipc` and `src/webview/src/contexts/jsonrpc-rx-context.tsx` | IPC transport |
 | Settings read/write | `src/extension/providers/data/atlassian/atlassianConfig.ts`, `src/extension/handlers/settings.ts` | Standard settings usage |
-| Secrets | `src/extension/providers/data/atlassian/atlassianClient.ts` | API token + OAuth tokens |
+| Secrets | `src/extension/providers/data/atlassian/atlassianClient.ts` | API token |
 | Auth metadata | `src/extension/providers/data/atlassian/atlassianClient.ts` | `globalState` keys |
 | Restart flags | `src/extension/constants.ts`, `src/extension/extension.ts` | `globalState` flag |
 | Logs | `src/extension/providers/data/atlassian/logger.ts` | Output channel |

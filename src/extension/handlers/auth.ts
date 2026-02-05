@@ -22,13 +22,13 @@ export const createAuthHandlers = ({
   const getState = async () => {
     const defaults = await client.getApiTokenDefaults();
     const envApiConfig = getApiTokenConfig();
-    const authType = client.getAuthType();
     const hasStoredToken = await client.hasStoredApiToken();
     const hasEnvToken = Boolean(
       envApiConfig.baseUrl && envApiConfig.email && envApiConfig.apiToken,
     );
-    const isConfigured =
-      authType === "oauth" || hasEnvToken || (authType === "apiToken" && hasStoredToken);
+    const hasStoredConfig = Boolean(defaults.baseUrl && defaults.email && hasStoredToken);
+    const isConfigured = hasEnvToken || hasStoredConfig;
+    const authType = isConfigured ? "apiToken" : "none";
 
     const configSource = isConfigured ? getApiTokenConfigSource() : "none";
 

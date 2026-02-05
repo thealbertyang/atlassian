@@ -11,8 +11,7 @@ export const Route = createFileRoute("/overview/")({
 
 function OverviewPage() {
   const { status, state } = useAppContext();
-  const authLabel =
-    state.authType === "oauth" ? "OAuth 2.0" : state.authType === "apiToken" ? "API token" : "Not set";
+  const authLabel = state.authType === "apiToken" ? "API token" : "Not set";
   const sourceLabel = status.source === "Not configured" ? "Not configured" : status.source;
   const nextSteps = status.isConnected
     ? [

@@ -181,26 +181,6 @@
 					"default": "",
 					"markdownDescription": "Atlassian API token. Prefer storing this in .env.local or using the Connect flow. [Sync from .env.local](command:atlassian.syncEnvToSettings)"
 				},
-				"atlassian.oauthClientId": {
-					"type": "string",
-					"default": "",
-					"description": "Atlassian OAuth client ID."
-				},
-				"atlassian.oauthClientSecret": {
-					"type": "string",
-					"default": "",
-					"description": "Atlassian OAuth client secret."
-				},
-				"atlassian.oauthScopes": {
-					"type": "string",
-					"default": "read:jira-work offline_access",
-					"description": "Atlassian OAuth scopes."
-				},
-				"atlassian.oauthRedirectPort": {
-					"type": "number",
-					"default": 8765,
-					"description": "Local OAuth redirect port."
-				},
 				"atlassian.jql": {
 					"type": "string",
 					"default": "assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC",
@@ -210,6 +190,11 @@
 					"type": "number",
 					"default": 50,
 					"description": "Maximum number of issues to fetch per refresh."
+				},
+				"atlassian.docsPath": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Optional path to a docs directory containing Markdown files. Used by the Docs tab (e.g. `/path/to/docs`)."
 				},
 				"atlassian.webviewDevPath": {
 					"type": "string",
