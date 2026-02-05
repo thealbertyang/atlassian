@@ -79,7 +79,7 @@ const renderMermaid = async (
   container: HTMLElement | null,
   initializedRef: MutableRefObject<boolean>,
 ) => {
-  if (!container) {
+  if (!container || !container.isConnected) {
     return;
   }
   const codeBlocks = Array.from(
@@ -94,28 +94,50 @@ const renderMermaid = async (
       return;
     }
 
-    codeBlocks.forEach((code) => {
-      const parent = code.parentElement;
-      if (!parent) {
-        return;
-      }
-      const diagram = code.textContent ?? "";
-      const wrapper = document.createElement("div");
-      wrapper.className = "mermaid";
-      wrapper.textContent = diagram;
-      parent.replaceWith(wrapper);
-    });
-
     if (!initializedRef.current) {
       mermaid.initialize({
         startOnLoad: false,
         theme: "neutral",
         securityLevel: "strict",
+        flowchart: {
+          useMaxWidth: true,
+        },
       });
       initializedRef.current = true;
     }
 
-    await mermaid.run({ nodes: container.querySelectorAll(".mermaid") });
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+    let index = 0;
+    for (const code of codeBlocks) {
+      const parent = code.parentElement;
+      if (!parent) {
+        continue;
+      }
+      const diagram = code.textContent ?? "";
+      const wrapper = document.createElement("div");
+      wrapper.className = "mermaid";
+      parent.replaceWith(wrapper);
+
+      if (!wrapper.isConnected) {
+        continue;
+      }
+
+      const id = `mermaid-${Date.now()}-${index++}`;
+      try {
+        const { svg, bindFunctions } = await mermaid.render(id, diagram, wrapper);
+        if (!wrapper.isConnected) {
+          continue;
+        }
+        wrapper.innerHTML = svg;
+        bindFunctions?.(wrapper);
+      } catch (error) {
+        wrapper.innerHTML = `<pre class="mermaid-error">${String(
+          (error as Error)?.message ?? error,
+        )}</pre>`;
+        console.warn("Mermaid render failed", error);
+      }
+    }
   } catch (error) {
     console.warn("Mermaid render failed", error);
   }
@@ -194,9 +216,17 @@ function DocsPage() {
       }
     }
     if (!activeId && index.entries.length > 0) {
-      setActiveId(index.entries[0].id);
+      const fallbackId = index.entries[0].id;
+      setActiveId(fallbackId);
+      const next = new URLSearchParams(searchParams);
+      next.set("doc", fallbackId);
+      navigate({
+        to: "/docs",
+        search: Object.fromEntries(next.entries()),
+        replace: true,
+      });
     }
-  }, [index, activeId, docParam]);
+  }, [index, activeId, docParam, navigate, searchParams]);
 
   useEffect(() => {
     if (!isWebview || !activeId) {
@@ -258,21 +288,26 @@ function DocsPage() {
     void renderMermaid(markdownRef.current, mermaidReadyRef);
   }, [markdownHtml]);
 
-  useEffect(() => {
-    if (!activeId) {
+  const selectDoc = (nextId: string, anchor?: string) => {
+    if (!nextId) {
       return;
     }
-    if (docParam === activeId) {
-      return;
+    if (nextId !== activeId) {
+      setActiveId(nextId);
+    }
+    if (anchor) {
+      setPendingAnchor(anchor);
     }
     const next = new URLSearchParams(searchParams);
-    next.set("doc", activeId);
-    navigate({
-      to: "/docs",
-      search: Object.fromEntries(next.entries()),
-      replace: true,
-    });
-  }, [activeId, docParam, navigate, searchParams]);
+    next.set("doc", nextId);
+    if (docParam !== nextId) {
+      navigate({
+        to: "/docs",
+        search: Object.fromEntries(next.entries()),
+        replace: true,
+      });
+    }
+  };
 
   const sourceLabel = index?.source
     ? index.source === "settings"
@@ -307,8 +342,7 @@ function DocsPage() {
       return;
     }
     if (docTarget.id !== activeId) {
-      setPendingAnchor(docTarget.anchor ?? "");
-      setActiveId(docTarget.id);
+      selectDoc(docTarget.id, docTarget.anchor ?? "");
       return;
     }
     if (docTarget.anchor) {
@@ -369,7 +403,7 @@ function DocsPage() {
                         key={entry.id}
                         type="button"
                         className={`doc-item ${activeId === entry.id ? "active" : ""}`}
-                        onClick={() => setActiveId(entry.id)}
+                        onClick={() => selectDoc(entry.id)}
                       >
                         <span className="doc-title">{entry.title}</span>
                         <span className="doc-path">{entry.relativePath}</span>
