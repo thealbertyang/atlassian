@@ -1,3 +1,5 @@
+@import "github-markdown-css/github-markdown.css";
+
 .app {
   display: flex;
   flex-direction: column;
@@ -555,51 +557,15 @@
 }
 
 .markdown-body {
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
   font-size: 12px;
   line-height: 1.65;
   color: var(--vscode-foreground, #1f2328);
-}
-
-.markdown-body h1 {
-  font-size: 18px;
-  margin: 18px 0 12px;
-}
-
-.markdown-body h2 {
-  font-size: 15px;
-  margin: 16px 0 10px;
-}
-
-.markdown-body h3 {
-  font-size: 13px;
-  margin: 14px 0 8px;
-}
-
-.markdown-body p {
-  margin: 8px 0;
-}
-
-.markdown-body ul,
-.markdown-body ol {
-  padding-left: 18px;
-  margin: 8px 0;
-}
-
-.markdown-body li {
-  margin-bottom: 6px;
-}
-
-.markdown-body blockquote {
-  border-left: 3px solid var(--vscode-editorWidget-border, #d0d7de);
-  margin: 12px 0;
-  padding: 8px 12px;
-  background: var(--vscode-sideBar-background, #f6f8fa);
-  color: var(--vscode-descriptionForeground, #57606a);
+  background: transparent;
 }
 
 .markdown-body pre {
   font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 11px;
   background: var(--vscode-textCodeBlock-background, #1e1e1e);
   color: var(--vscode-editor-foreground, #d4d4d4);
   padding: 12px;
@@ -618,23 +584,30 @@
   border-radius: 8px;
   padding: 12px;
   overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 .markdown-body .mermaid svg {
   max-width: 100%;
   height: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 .markdown-body code {
   font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 11px;
+  background: var(--vscode-textCodeBlock-background, #1e1e1e);
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  border-radius: 4px;
+  padding: 2px 4px;
 }
 
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
   margin: 12px 0;
-  font-size: 11px;
 }
 
 .markdown-body th,
