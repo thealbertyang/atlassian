@@ -612,6 +612,19 @@
   padding: 0;
 }
 
+.markdown-body .mermaid {
+  background: var(--vscode-editor-background, #ffffff);
+  border: 1px solid var(--vscode-editorWidget-border, #d0d7de);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.markdown-body .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
 .markdown-body code {
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 11px;

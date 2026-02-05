@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type MutableRefObject } from "react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+import mermaidScriptUrl from "mermaid/dist/mermaid.min.js?url";
 import type { DocContent, DocEntry, DocsIndex, DocGroup } from "@shared/docs-contract";
 import { useHandlers } from "../../hooks/use-handlers";
 import { useAppContext } from "../../contexts/app-context";
@@ -73,6 +74,78 @@ const scrollToAnchor = (anchor: string, container?: HTMLElement | null) => {
   target.scrollIntoView({ behavior: "smooth", block: "start" });
 };
 
+let mermaidScriptPromise: Promise<void> | null = null;
+
+const loadMermaid = async () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const existing = (window as { mermaid?: unknown }).mermaid;
+  if (existing) {
+    return;
+  }
+  if (!mermaidScriptPromise) {
+    mermaidScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = mermaidScriptUrl;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Mermaid runtime."));
+      document.head.appendChild(script);
+    });
+  }
+  await mermaidScriptPromise;
+};
+
+const renderMermaid = async (
+  container: HTMLElement | null,
+  initializedRef: MutableRefObject<boolean>,
+) => {
+  if (!container) {
+    return;
+  }
+  const codeBlocks = Array.from(
+    container.querySelectorAll("pre code.language-mermaid, pre code.lang-mermaid"),
+  );
+  if (codeBlocks.length === 0) {
+    return;
+  }
+
+  try {
+    await loadMermaid();
+    const mermaid = (window as { mermaid?: { initialize: (config: unknown) => void; run: (opts: unknown) => Promise<void> } })
+      .mermaid;
+    if (!mermaid) {
+      return;
+    }
+
+    codeBlocks.forEach((code) => {
+      const parent = code.parentElement;
+      if (!parent) {
+        return;
+      }
+      const diagram = code.textContent ?? "";
+      const wrapper = document.createElement("div");
+      wrapper.className = "mermaid";
+      wrapper.textContent = diagram;
+      parent.replaceWith(wrapper);
+    });
+
+    if (!initializedRef.current) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "neutral",
+        securityLevel: "strict",
+      });
+      initializedRef.current = true;
+    }
+
+    await mermaid.run({ nodes: container.querySelectorAll(".mermaid") });
+  } catch (error) {
+    console.warn("Mermaid render failed", error);
+  }
+};
+
 function DocsPage() {
   const handlers = useHandlers();
   const { isWebview, openSettings } = useAppContext();
@@ -85,6 +158,7 @@ function DocsPage() {
   const [contentError, setContentError] = useState("");
   const [pendingAnchor, setPendingAnchor] = useState("");
   const markdownRef = useRef<HTMLElement | null>(null);
+  const mermaidReadyRef = useRef(false);
 
   const entries = index?.entries ?? [];
 
@@ -194,6 +268,10 @@ function DocsPage() {
     return parseMarkdown(content.markdown);
   }, [content]);
 
+  useEffect(() => {
+    void renderMermaid(markdownRef.current, mermaidReadyRef);
+  }, [markdownHtml]);
+
   const sourceLabel = index?.source
     ? index.source === "settings"
       ? "Settings"
@@ -220,10 +298,10 @@ function DocsPage() {
     event.preventDefault();
     const baseId = content?.relativePath || activeId;
     const docTarget = baseId ? resolveDocTarget(href, baseId) : null;
+    if (!docTarget && baseId) {
+      void handlers.revealDocAsset(baseId, href);
+    }
     if (!docTarget) {
-      if (baseId) {
-        void handlers.revealDocAsset(baseId, href);
-      }
       return;
     }
     if (docTarget.id !== activeId) {
