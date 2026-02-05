@@ -21,7 +21,8 @@ const GROUP_LABELS: Record<DocGroup, string> = {
 };
 
 const parseMarkdown = (markdown: string) => {
-  const raw = marked.parse(markdown, { gfm: true, breaks: true });
+  const source = typeof markdown === "string" ? markdown : String(markdown ?? "");
+  const raw = marked.parse(source, { gfm: true, breaks: true });
   return DOMPurify.sanitize(raw);
 };
 
@@ -29,7 +30,7 @@ const resolveDocTarget = (
   href: string,
   currentId: string,
 ): { id: string; anchor?: string } | null => {
-  const trimmed = href.trim();
+  const trimmed = String(href ?? "").trim();
   if (!trimmed) {
     return null;
   }
@@ -76,6 +77,32 @@ const scrollToAnchor = (anchor: string, container?: HTMLElement | null) => {
 
 let mermaidScriptPromise: Promise<void> | null = null;
 
+const resolveWebviewAssetUrl = (value: string): string => {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("vscode-webview://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
+  }
+  const base = (window as { __webview_uri__?: string }).__webview_uri__?.replace(/\/$/, "");
+  if (!base) {
+    return trimmed;
+  }
+  const normalized = trimmed.startsWith("./")
+    ? trimmed.slice(2)
+    : trimmed.startsWith("/")
+      ? trimmed.slice(1)
+      : trimmed;
+  return `${base}/${normalized}`;
+};
+
 const loadMermaid = async () => {
   if (typeof window === "undefined") {
     return;
@@ -87,7 +114,7 @@ const loadMermaid = async () => {
   if (!mermaidScriptPromise) {
     mermaidScriptPromise = new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = mermaidScriptUrl;
+      script.src = resolveWebviewAssetUrl(mermaidScriptUrl);
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("Failed to load Mermaid runtime."));
@@ -288,7 +315,7 @@ function DocsPage() {
     if (!link) {
       return;
     }
-    const href = link.getAttribute("href") ?? "";
+    const href = String(link.getAttribute("href") ?? "");
     const trimmed = href.trim();
     const isExternal =
       trimmed.startsWith("//") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed);
