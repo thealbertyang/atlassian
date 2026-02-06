@@ -2,9 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "compile",
+      "label": "typecheck",
       "type": "shell",
-      "command": "bun run compile",
+      "command": "bun run typecheck",
       "isBackground": false,
       "presentation": {
         "reveal": "always",

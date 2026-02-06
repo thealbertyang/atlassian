@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAppContext } from "../../contexts/app-context";
+import { OpenSettingsButton } from "../../components/OpenSettingsButton";
 
 export const Route = createFileRoute("/jira/")({
   component: JiraPage,
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/jira/")({
 });
 
 function JiraPage() {
-  const { issueKey, issue, issueLoading, issueError, openSettings, isWebview } = useAppContext();
+  const { issueKey, issue, issueLoading, issueError } = useAppContext();
 
   return (
     <section className="grid">
@@ -38,9 +39,7 @@ function JiraPage() {
         <h2>Workspace settings</h2>
         <p className="note">Update Jira credentials or JQL in VS Code settings.</p>
         <div className="actions">
-          <button className="secondary" onClick={openSettings} disabled={!isWebview}>
-            Open VS Code Settings
-          </button>
+          <OpenSettingsButton />
         </div>
       </div>
     </section>

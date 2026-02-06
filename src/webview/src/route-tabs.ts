@@ -40,26 +40,40 @@ const titleCase = (value: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-export const TAB_ROUTES: TabRoute[] = Object.entries(routeModules)
-  .map(([filePath, module]) => {
-    const segment = extractSegment(filePath);
-    if (!segment) {
-      return null;
+function computeTabs(): TabRoute[] {
+  return Object.entries(routeModules)
+    .map(([filePath, module]) => {
+      const segment = extractSegment(filePath);
+      if (!segment) {
+        return null;
+      }
+      const meta = module.Route?.options?.staticData as
+        | { tabLabel?: string; tabHidden?: boolean; tabOrder?: number }
+        | undefined;
+      if (meta?.tabHidden) {
+        return null;
+      }
+      const label = meta?.tabLabel ?? titleCase(segment);
+      const order = meta?.tabOrder ?? 0;
+      return {
+        segment,
+        path: toPath(segment, module.Route),
+        label,
+        order,
+      } as TabRoute;
+    })
+    .filter((value): value is TabRoute => Boolean(value))
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
+}
+
+export const TAB_ROUTES: TabRoute[] = computeTabs();
+
+if (import.meta.hot) {
+  import.meta.hot.accept((newModule) => {
+    if (newModule) {
+      window.dispatchEvent(
+        new CustomEvent("hmr:tab-routes", { detail: newModule.TAB_ROUTES }),
+      );
     }
-    const meta = module.Route?.options?.staticData as
-      | { tabLabel?: string; tabHidden?: boolean; tabOrder?: number }
-      | undefined;
-    if (meta?.tabHidden) {
-      return null;
-    }
-    const label = meta?.tabLabel ?? titleCase(segment);
-    const order = meta?.tabOrder ?? 0;
-    return {
-      segment,
-      path: toPath(segment, module.Route),
-      label,
-      order,
-    } as TabRoute;
-  })
-  .filter((value): value is TabRoute => Boolean(value))
-  .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
+  });
+}

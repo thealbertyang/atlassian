@@ -49,14 +49,14 @@ export const createSettingsHandlers = ({ context, storage, client }: SettingsDep
       updates.push({ key: "jql", value: jql });
     }
 
-    if (envData.ATLASSIAN_WEBVIEW_DEV_SERVER_URL) {
+    if (envData.ATLASSIAN_WEBVIEW_SERVER_URL) {
       updates.push({
-        key: "webviewDevServerUrl",
-        value: envData.ATLASSIAN_WEBVIEW_DEV_SERVER_URL,
+        key: "webviewServerUrl",
+        value: envData.ATLASSIAN_WEBVIEW_SERVER_URL,
       });
     }
-    if (envData.ATLASSIAN_WEBVIEW_DEV_PATH) {
-      updates.push({ key: "webviewDevPath", value: envData.ATLASSIAN_WEBVIEW_DEV_PATH });
+    if (envData.ATLASSIAN_WEBVIEW_PATH) {
+      updates.push({ key: "webviewPath", value: envData.ATLASSIAN_WEBVIEW_PATH });
     }
     if (envData.ATLASSIAN_DOCS_PATH) {
       updates.push({ key: "docsPath", value: envData.ATLASSIAN_DOCS_PATH });

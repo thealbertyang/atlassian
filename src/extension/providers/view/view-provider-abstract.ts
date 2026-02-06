@@ -73,7 +73,7 @@ export abstract class AbstractViewProvider {
     const rewriteBase = assetBase ? assetBase.replace(/\/$/, "") : webviewBase;
 
     const root = htmlParser(htmlText);
-    const shouldRewrite = assetBase !== undefined || !htmlText.includes(AbstractViewProvider.VSCODE_WEBVIEW_HMR_MARK);
+    const shouldRewrite = !htmlText.includes(AbstractViewProvider.VSCODE_WEBVIEW_HMR_MARK);
 
     if (shouldRewrite) {
       const tagToChange = [

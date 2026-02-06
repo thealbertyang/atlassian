@@ -1,20 +1,21 @@
-import { ExtensionContext, ExtensionMode, Uri, Webview, WebviewPanel } from "vscode";
+import { ExtensionContext, Uri, Webview, WebviewPanel } from "vscode";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { HandlerConfig } from "@jsonrpc-rx/server";
 import { AbstractViewProvider } from "./view-provider-abstract";
-import { DEFAULT_WEBVIEW_DEV_PORT } from "../../constants";
+import { DEFAULT_WEBVIEW_PORT } from "../../constants";
 import { WebviewRenderTracker } from "../../service/webview-render-tracker";
 import type { WebviewRoute } from "../../service/webview-route";
 import { IPC_COMMANDS, IPC_EVENTS } from "../../../shared/ipc-contract";
 import { buildRouteHash, routeHintToPath } from "../../../shared/route-contract";
 import { WebviewIpcHost } from "../../service/webview-ipc";
-import { getWebviewDevServerUrl } from "../data/atlassian/atlassianConfig";
-import { resolveDevPath } from "../../webview/paths";
+import { getWebviewServerUrl } from "../data/atlassian/atlassianConfig";
+import { log } from "../data/atlassian/logger";
+import { resolveWebviewPath, resolveWebviewRoot } from "../../webview/paths";
 import {
-  getDevServerPort,
+  getServerPort,
   isLocalhostUrl,
-  normalizeDevServerUrl,
+  normalizeServerUrl,
 } from "../../webview/reachability";
 
 export class ViewProviderPanel extends AbstractViewProvider {
@@ -43,14 +44,15 @@ export class ViewProviderPanel extends AbstractViewProvider {
   async resolveWebviewView(webviewView: WebviewPanel) {
     const { webview } = webviewView;
     this.webviewReady = false;
-    const devInfo = this.getDevServerInfo();
+    const serverInfo = this.getServerInfo();
+    const hasServerUrl = Boolean(serverInfo.url);
     webview.options = {
       enableScripts: true,
       enableCommandUris: true,
       localResourceRoots: [this.context.extensionUri, Uri.joinPath(this.context.extensionUri, "out")],
       portMapping:
-        this.context.extensionMode === ExtensionMode.Development && devInfo.isLocal
-          ? [{ webviewPort: devInfo.port, extensionHostPort: devInfo.port }]
+        hasServerUrl && serverInfo.isLocal
+          ? [{ webviewPort: serverInfo.port, extensionHostPort: serverInfo.port }]
           : undefined,
     };
 
@@ -70,20 +72,17 @@ export class ViewProviderPanel extends AbstractViewProvider {
       this.ipc = undefined;
       this.webviewReady = false;
     });
-    if (this.context.extensionMode === ExtensionMode.Development) {
-      webview.html = this.getDevWaitingHtml(webview);
-      void this.updateWebview(webviewView);
-      return;
-    }
     webview.html = await this.getWebviewHtmlSafe(webview);
     this.renderTracker?.markRendered();
   }
 
-  private getDevServerInfo(): { url: string; port: number; isLocal: boolean } {
-    const configured = normalizeDevServerUrl(getWebviewDevServerUrl());
-    const fallback = `http://localhost:${DEFAULT_WEBVIEW_DEV_PORT}/`;
-    const url = configured || fallback;
-    const port = getDevServerPort(url) || DEFAULT_WEBVIEW_DEV_PORT;
+  private getServerInfo(): { url: string; port: number; isLocal: boolean } {
+    const configured = normalizeServerUrl(getWebviewServerUrl());
+    const url = configured || (resolveWebviewRoot(this.context.extensionPath) ? `http://localhost:${DEFAULT_WEBVIEW_PORT}/` : "");
+    if (!url) {
+      return { url: "", port: DEFAULT_WEBVIEW_PORT, isLocal: true };
+    }
+    const port = getServerPort(url) || DEFAULT_WEBVIEW_PORT;
     return { url, port, isLocal: isLocalhostUrl(url) };
   }
 
@@ -117,12 +116,9 @@ export class ViewProviderPanel extends AbstractViewProvider {
 
   private async getWebviewHtmlSafe(webview: Webview) {
     try {
-      const devHtml = await this.tryGetDevHtml(webview);
-      if (devHtml) {
-        return this.injectInitialRoute(devHtml);
-      }
-      if (this.context.extensionMode === ExtensionMode.Development) {
-        return this.injectInitialRoute(this.getDevWaitingHtml(webview));
+      const serverHtml = await this.tryGetServerHtml(webview);
+      if (serverHtml) {
+        return this.injectInitialRoute(serverHtml);
       }
       return this.injectInitialRoute(await this.getWebviewHtml(webview));
     } catch (error) {
@@ -131,128 +127,120 @@ export class ViewProviderPanel extends AbstractViewProvider {
     }
   }
 
-  private getDevServerUrl(): string {
-    return this.getDevServerInfo().url;
+  private getServerUrl(): string {
+    return this.getServerInfo().url;
   }
 
   private isAtlassianDevHtml(html: string): boolean {
     return html.includes("atlassian-webview");
   }
 
-  private async tryGetDevHtml(webview: Webview): Promise<string | undefined> {
-    if (this.context.extensionMode !== ExtensionMode.Development) {
+  private async tryGetServerHtml(webview: Webview): Promise<string | undefined> {
+    const devUrl = this.getServerUrl();
+    if (!devUrl) {
+      log("[webview] No server URL configured, skipping server HTML.");
       return undefined;
     }
 
-    const devUrl = this.getDevServerUrl();
-    const fetchedHtml = await this.fetchDevHtml(devUrl);
-    if (!fetchedHtml) {
-      const devPath = resolveDevPath(this.context.extensionPath);
-      if (!devPath) {
-        return undefined;
-      }
+    log(`[webview] Checking server at ${devUrl}...`);
+    if (!await this.isServerReachable(devUrl)) {
+      log("[webview] Server not reachable, falling back to production build.");
+      return undefined;
+    }
+    log("[webview] Server is reachable.");
+
+    const webviewRoot = resolveWebviewRoot(this.context.extensionPath);
+
+    // Try HMR plugin output from the repo (paths already rewritten, @vite/client injected)
+    if (webviewRoot) {
+      const hmrIndex = join(webviewRoot, this.wiewProviderOptions.indexPath);
       try {
-        const htmlText = readFileSync(devPath, { encoding: "utf8" }).toString();
-        return this.buildWebviewHtml(webview, htmlText);
-      } catch {
-        return undefined;
+        const htmlText = readFileSync(hmrIndex, { encoding: "utf8" }).toString();
+        if (htmlText.includes(AbstractViewProvider.VSCODE_WEBVIEW_HMR_MARK) && this.isAtlassianDevHtml(htmlText)) {
+          log(`[webview] Using HMR plugin output (${hmrIndex}).`);
+          return this.buildWebviewHtml(webview, htmlText, devUrl);
+        }
+      } catch (err) {
+        log(`[webview] Could not read HMR plugin output: ${err}`);
       }
     }
 
+    // Try source index.html from the repo (has /src/main.tsx that Vite can serve)
+    if (webviewRoot) {
+      const sourceIndex = join(webviewRoot, "src", "webview", "index.html");
+      try {
+        const htmlText = readFileSync(sourceIndex, { encoding: "utf8" }).toString();
+        if (this.isAtlassianDevHtml(htmlText)) {
+          log(`[webview] Using source index.html with server URL ${devUrl} (${sourceIndex}).`);
+          // Vite normally injects @vite/client and the React Refresh preamble via
+          // transformIndexHtml, but we load the HTML from disk so we must add them manually.
+          // Paths must be absolute URLs because inline module scripts resolve
+          // imports against the document origin (vscode-webview://…), not the Vite server.
+          const base = devUrl.replace(/\/$/, "");
+          const viteBootstrap = [
+            `<script type="module" src="${base}/@vite/client"></script>`,
+            '<script type="module">',
+            `  import RefreshRuntime from "${base}/@react-refresh";`,
+            '  RefreshRuntime.injectIntoGlobalHook(window);',
+            '  window.$RefreshReg$ = () => {};',
+            '  window.$RefreshSig$ = () => (type) => type;',
+            '  window.__vite_plugin_react_preamble_installed__ = true;',
+            '</script>',
+          ].join("\n");
+          const prepared = htmlText.replace(/<head>/i, `<head>${viteBootstrap}`);
+          return this.buildWebviewHtml(webview, prepared, devUrl);
+        }
+      } catch (err) {
+        log(`[webview] Could not read source index.html: ${err}`);
+      }
+    }
+
+    // Try production HTML with HMR mark from installed extension
     const indexPath = join(this.context.extensionPath, this.wiewProviderOptions.indexPath);
     try {
       const htmlText = readFileSync(indexPath, { encoding: "utf8" }).toString();
-      if (
-        htmlText.includes(AbstractViewProvider.VSCODE_WEBVIEW_HMR_MARK) &&
-        this.isAtlassianDevHtml(htmlText)
-      ) {
+      const hasHmrMark = htmlText.includes(AbstractViewProvider.VSCODE_WEBVIEW_HMR_MARK);
+      const hasAtlassianMark = this.isAtlassianDevHtml(htmlText);
+      if (hasHmrMark && hasAtlassianMark) {
+        log(`[webview] Using installed HTML with server URL ${devUrl}.`);
         return this.buildWebviewHtml(webview, htmlText, devUrl);
       }
     } catch {
-      // ignore and fall back to fetched HTML
+      // ignore
     }
 
-    return this.buildWebviewHtml(webview, fetchedHtml, devUrl);
+    // Try local webview path
+    const webviewPath = resolveWebviewPath(this.context.extensionPath);
+    if (webviewPath) {
+      log(`[webview] Trying local webview path: ${webviewPath}`);
+      try {
+        const htmlText = readFileSync(webviewPath, { encoding: "utf8" }).toString();
+        return this.buildWebviewHtml(webview, htmlText);
+      } catch {
+        log("[webview] Could not read local webview path.");
+      }
+    }
+
+    log("[webview] No server HTML available, falling back to production build.");
+    return undefined;
   }
 
-  private getDevWaitingHtml(webview: Webview) {
-    const devUrl = this.getDevServerUrl();
-    const html = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Atlassian Sprint</title>
-    <style>
-      body { font-family: sans-serif; padding: 24px; color: #1f2328; }
-      .card { border: 1px solid #d0d7de; border-radius: 8px; padding: 16px; background: #f6f8fa; max-width: 560px; }
-      code { background: #f0f0f0; padding: 2px 4px; border-radius: 4px; }
-      .muted { color: #57606a; margin-top: 8px; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h2>Waiting for webview dev server…</h2>
-      <p>Attempting to connect to <code>${devUrl}</code>.</p>
-      <p class="muted">If it does not start, run <code>bun run dev:webview</code>.</p>
-    </div>
-    <script type="module">
-      const devUrl = "${devUrl}";
-      const vscodeApi = typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : undefined;
-      let requested = false;
-      const looksLikeVite = (text) =>
-        (text.includes("@vite/client") || text.includes("vite-plugin-vscode-webview-hmr")) &&
-        text.includes("atlassian-webview");
-      const poll = async () => {
-        try {
-          const res = await fetch(devUrl);
-          if (res && res.ok) {
-            const text = await res.text();
-            if (looksLikeVite(text)) {
-              if (!requested && vscodeApi) {
-                requested = true;
-                vscodeApi.postMessage({ kind: "command", name: "${IPC_COMMANDS.REFRESH_WEBVIEW}" });
-              }
-              return;
-            }
-          }
-        } catch {}
-        setTimeout(poll, 600);
-      };
-      poll();
-    </script>
-  </body>
-</html>`;
-    return this.buildWebviewHtml(webview, html, devUrl);
-  }
-
-  private async fetchDevHtml(devUrl: string): Promise<string | undefined> {
+  private async isServerReachable(devUrl: string): Promise<boolean> {
     if (typeof fetch !== "function") {
-      return undefined;
+      return false;
     }
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 800);
     try {
       const response = await fetch(devUrl, { signal: controller.signal });
-      if (!response.ok) {
-        return undefined;
-      }
-      const text = await response.text();
-      if (
-        !this.isAtlassianDevHtml(text) ||
-        (!text.includes("@vite/client") &&
-          !text.includes(AbstractViewProvider.VSCODE_WEBVIEW_HMR_MARK))
-      ) {
-        return undefined;
-      }
-      return text;
+      return response.ok;
     } catch {
-      return undefined;
+      return false;
     } finally {
       clearTimeout(timeout);
     }
   }
+
 
   private getFallbackHtml(webview: Webview, message: string) {
     const escaped = message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

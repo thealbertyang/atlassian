@@ -5,19 +5,8 @@ import "./index.css";
 
 const router = createRouter();
 
-const mount = () => {
-  const rootEl = document.getElementById("root");
-  if (!rootEl) {
-    return;
-  }
+const rootEl = document.getElementById("root");
+if (rootEl) {
   const root = createRoot(rootEl);
   root.render(<RouterProvider router={router} />);
-};
-
-if (import.meta.env.DEV) {
-  void import("@tanstack/react-start").then(({ StartClient }) => {
-    StartClient({ router });
-  });
-} else {
-  mount();
 }

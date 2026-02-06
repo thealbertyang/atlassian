@@ -3,21 +3,22 @@ import { AtlassianClient } from "./providers/data/atlassian/atlassianClient";
 import { AtlassianIssuesProvider } from "./providers/data/atlassian/issueProvider";
 import { getHandlers } from "./handlers";
 import { log, outputChannel } from "./providers/data/atlassian/logger";
-import { WebviewDevServer } from "./service/webview-dev-server";
+import { WebviewServer } from "./service/webview-dev-server";
 import { ExtensionBuildWatcher } from "./service/extension-build-watcher";
 import { ExtensionInstaller } from "./service/extension-installer";
 import { AtlassianUriHandler } from "./service/uri-handler";
 import type { WebviewRoute } from "./service/webview-route";
 import { WebviewRenderTracker } from "./service/webview-render-tracker";
 import { ViewProviderPanel } from "./providers/view/view-provider-panel";
-import { DEFAULT_WEBVIEW_DEV_PORT, REOPEN_APP_AFTER_RESTART_KEY } from "./constants";
+import { DEFAULT_WEBVIEW_PORT, REOPEN_APP_AFTER_RESTART_KEY } from "./constants";
 import { resolveWebviewRoot } from "./webview/paths";
 import { StorageService } from "./service/storage-service";
-import { getWebviewDevServerUrl } from "./providers/data/atlassian/atlassianConfig";
+import { getWebviewServerUrl } from "./providers/data/atlassian/atlassianConfig";
 import {
-  getDevServerPort,
+  getServerPort,
   isLocalhostUrl,
-  normalizeDevServerUrl,
+  normalizeServerUrl,
+  waitForServer,
 } from "./webview/reachability";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -28,7 +29,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const storage = new StorageService(context, "atlassian");
   const client = new AtlassianClient(context, storage);
   const provider = new AtlassianIssuesProvider(client);
-  const devWebviewServer = new WebviewDevServer();
+  const webviewServer = new WebviewServer();
   const buildWatcher = new ExtensionBuildWatcher();
   const extensionInstaller = new ExtensionInstaller();
   const renderTracker = new WebviewRenderTracker();
@@ -91,7 +92,7 @@ export function activate(context: vscode.ExtensionContext): void {
     storage,
     client,
     provider,
-    devWebviewServer,
+    webviewServer,
     extensionInstaller,
     buildWatcher,
     renderTracker,
@@ -122,18 +123,23 @@ export function activate(context: vscode.ExtensionContext): void {
 
   if (context.extensionMode === vscode.ExtensionMode.Development) {
     buildWatcher.start(context.extensionPath);
-    const cwd = resolveWebviewRoot(context.extensionPath);
-    if (cwd) {
-      const configuredUrl = normalizeDevServerUrl(getWebviewDevServerUrl());
-      const devUrl = configuredUrl || `http://localhost:${DEFAULT_WEBVIEW_DEV_PORT}/`;
-      if (!configuredUrl || isLocalhostUrl(devUrl)) {
-        const port = getDevServerPort(devUrl) || DEFAULT_WEBVIEW_DEV_PORT;
-        devWebviewServer.start(cwd, port);
-      } else {
-        log(`Webview dev server not started (using ${configuredUrl}).`);
-      }
+  }
+
+  const configuredUrl = normalizeServerUrl(getWebviewServerUrl());
+  const cwd = resolveWebviewRoot(context.extensionPath);
+  if (cwd) {
+    const devUrl = configuredUrl || `http://localhost:${DEFAULT_WEBVIEW_PORT}/`;
+    if (!configuredUrl || isLocalhostUrl(devUrl)) {
+      const port = getServerPort(devUrl) || DEFAULT_WEBVIEW_PORT;
+      webviewServer.start(cwd, port);
+      void waitForServer(devUrl, 20, 500).then((ready) => {
+        if (ready) {
+          log("Webview server ready, refreshing panel.");
+          void refreshAppPanel();
+        }
+      });
     } else {
-      log("Webview dev server not started: src/webview not found.");
+      log(`Webview server not started (using ${configuredUrl}).`);
     }
   }
 
@@ -144,7 +150,7 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   context.subscriptions.push(
-    devWebviewServer,
+    webviewServer,
     buildWatcher,
     extensionInstaller,
     vscode.commands.registerCommand("atlassian.refresh", () => {

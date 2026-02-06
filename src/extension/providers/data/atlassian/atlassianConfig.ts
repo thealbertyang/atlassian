@@ -19,19 +19,19 @@ const TOKEN_KEYS = ["JIRA_API_TOKEN", "ATLASSIAN_API_TOKEN"];
 const isMaskedSecret = (value: string) => value.trim() === MASKED_SECRET;
 const stripMaskedSecret = (value: string) => (isMaskedSecret(value) ? "" : value);
 
-export function getWebviewDevServerUrl(): string {
+export function getWebviewServerUrl(): string {
   const config = vscode.workspace.getConfiguration("atlassian");
   const env = getEnvMap();
-  const fromConfig = resolveEnvPlaceholders(String(config.get("webviewDevServerUrl") || ""), env);
-  const fromEnv = getEnvValue(env, "ATLASSIAN_WEBVIEW_DEV_SERVER_URL");
+  const fromConfig = resolveEnvPlaceholders(String(config.get("webviewServerUrl") || ""), env);
+  const fromEnv = getEnvValue(env, "ATLASSIAN_WEBVIEW_SERVER_URL");
   return (fromConfig || fromEnv).trim();
 }
 
-export function getWebviewDevPath(): string {
+export function getWebviewPath(): string {
   const config = vscode.workspace.getConfiguration("atlassian");
   const env = getEnvMap();
-  const fromConfig = resolveEnvPlaceholders(String(config.get("webviewDevPath") || ""), env);
-  const fromEnv = getEnvValue(env, "ATLASSIAN_WEBVIEW_DEV_PATH");
+  const fromConfig = resolveEnvPlaceholders(String(config.get("webviewPath") || ""), env);
+  const fromEnv = getEnvValue(env, "ATLASSIAN_WEBVIEW_PATH");
   return (fromConfig || fromEnv).trim();
 }
 

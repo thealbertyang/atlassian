@@ -1,7 +1,7 @@
 import * as http from "http";
 import * as https from "https";
 
-export function getDevServerPort(url: string): number {
+export function getServerPort(url: string): number {
   try {
     const parsed = new URL(url);
     if (parsed.port) {
@@ -13,7 +13,7 @@ export function getDevServerPort(url: string): number {
   }
 }
 
-export function normalizeDevServerUrl(raw: string): string {
+export function normalizeServerUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) {
     return "";
@@ -45,7 +45,7 @@ export function isLocalhostUrl(url: string): boolean {
   }
 }
 
-export function isDevServerReachable(url: string, timeoutMs = 350): Promise<boolean> {
+export function isServerReachable(url: string, timeoutMs = 350): Promise<boolean> {
   return new Promise((resolve) => {
     try {
       const parsed = new URL(url);
@@ -74,13 +74,13 @@ export function isDevServerReachable(url: string, timeoutMs = 350): Promise<bool
   });
 }
 
-export async function waitForDevServer(
+export async function waitForServer(
   url: string,
   attempts: number,
   delayMs: number,
 ): Promise<boolean> {
   for (let i = 0; i < attempts; i += 1) {
-    if (await isDevServerReachable(url)) {
+    if (await isServerReachable(url)) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, delayMs));

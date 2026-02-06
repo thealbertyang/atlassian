@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useAppContext } from "../../../contexts/app-context";
+import { OpenSettingsButton } from "../../../components/OpenSettingsButton";
 
 export const Route = createFileRoute("/jira/issues/$key")({
   component: JiraIssuePage,
@@ -29,7 +30,6 @@ function JiraIssuePage() {
     copyDeepLink,
     deepLinkUrl,
     isWebview,
-    openSettings,
   } = useAppContext();
 
   const description = useMemo(() => {
@@ -167,9 +167,7 @@ function JiraIssuePage() {
           issue.
         </p>
         <div className="actions">
-          <button className="secondary" onClick={openSettings} disabled={!isWebview}>
-            Open VS Code Settings
-          </button>
+          <OpenSettingsButton />
         </div>
       </div>
     </section>

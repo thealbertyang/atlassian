@@ -8,12 +8,8 @@
     "predev": "bun run clean:stale-js",
     "prebuild": "bun run clean:stale-js",
     "dev": "bunx vite",
-    "dev:webview": "bunx vite",
     "build": "vite build",
-    "watch": "vite build --watch",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
-    "clear": "rimraf ./node_modules"
+    "watch": "vite build --watch"
   },
   "dependencies": {
     "@jsonrpc-rx/client": "^0.2.2",

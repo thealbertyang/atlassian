@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import { resolve } from "path";
 import react from "@vitejs/plugin-react-swc";
 import vscodeWebviewHmr from "vite-plugin-vscode-webview-hmr";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 export default defineConfig(({ command }) => {
@@ -12,23 +11,11 @@ export default defineConfig(({ command }) => {
     root: resolve(__dirname),
     appType: "spa",
     base: isServe ? "/" : "./",
-    environments: {
-      client: {},
-    },
     plugins: [
-      isServe
-        ? tanstackStart({
-            spa: {
-              enabled: true,
-              prerender: {
-                outputPath: "/index.html",
-              },
-            },
-          })
-        : tanstackRouter({
-            target: "react",
-            autoCodeSplitting: true,
-          }),
+      tanstackRouter({
+        target: "react",
+        autoCodeSplitting: true,
+      }),
       isServe ? vscodeWebviewHmr() : undefined,
       react(),
     ].filter(Boolean),

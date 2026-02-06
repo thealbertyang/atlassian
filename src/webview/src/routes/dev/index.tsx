@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAppContext } from "../../contexts/app-context";
+import { KvGrid, type KvItem } from "../../components/KvGrid";
 
 export const Route = createFileRoute("/dev/")({
   component: DevPage,
@@ -66,16 +67,12 @@ function DevPage() {
             <p className="card-sub">When the extension or webview last updated.</p>
           </div>
         </div>
-        <div className="kv-grid">
-          <div className="kv">
-            <div className="kv-label">Extension build</div>
-            <div className="kv-value">{formatTimestamp(state.dev?.lastExtensionBuildAt)}</div>
-          </div>
-          <div className="kv">
-            <div className="kv-label">Webview render</div>
-            <div className="kv-value">{formatTimestamp(state.dev?.lastWebviewRenderAt)}</div>
-          </div>
-        </div>
+        <KvGrid
+          items={[
+            { label: "Extension build", value: formatTimestamp(state.dev?.lastExtensionBuildAt) },
+            { label: "Webview render", value: formatTimestamp(state.dev?.lastWebviewRenderAt) },
+          ]}
+        />
         <div className="callout">
           If HMR stalls, restart the webview or refresh the extension host.
         </div>

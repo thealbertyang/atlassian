@@ -1,10 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { getWebviewDevPath } from "../providers/data/atlassian/atlassianConfig";
+import { getWebviewPath } from "../providers/data/atlassian/atlassianConfig";
 
-export function resolveDevPath(extensionPath: string): string {
-  const configured = getWebviewDevPath();
+export function resolveWebviewPath(extensionPath: string): string {
+  const configured = getWebviewPath();
   if (configured) {
     return configured;
   }

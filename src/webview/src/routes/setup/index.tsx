@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAppContext } from "../../contexts/app-context";
+import { StatusPill } from "../../components/ConnectionPill";
 import { MASKED_SECRET } from "../../constants";
 
 export const Route = createFileRoute("/setup/")({
@@ -25,9 +26,10 @@ function SetupPage() {
             <h2>Connect with a token</h2>
             <p className="card-sub">Fastest option for personal use or quick setup.</p>
           </div>
-          <span className={`pill ${state.apiTokenConfigured ? "pill-ok" : "pill-muted"}`}>
-            {tokenStatus}
-          </span>
+          <StatusPill
+            variant={state.apiTokenConfigured ? "ok" : "muted"}
+            label={tokenStatus}
+          />
         </div>
         <div className="row">
           <label htmlFor="baseUrl">Jira site URL</label>

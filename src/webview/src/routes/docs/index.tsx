@@ -6,6 +6,7 @@ import mermaid from "mermaid";
 import type { DocContent, DocEntry, DocsIndex, DocGroup } from "@shared/docs-contract";
 import { useHandlers } from "../../hooks/use-handlers";
 import { useAppContext } from "../../contexts/app-context";
+import { OpenSettingsButton } from "../../components/OpenSettingsButton";
 
 export const Route = createFileRoute("/docs/")({
   component: DocsPage,
@@ -145,7 +146,7 @@ const renderMermaid = async (
 
 function DocsPage() {
   const handlers = useHandlers();
-  const { isWebview, openSettings } = useAppContext();
+  const { isWebview } = useAppContext();
   const navigate = useNavigate();
   const location = useRouterState({ select: (state) => state.location });
   const [index, setIndex] = useState<DocsIndex | null>(null);
@@ -379,9 +380,7 @@ function DocsPage() {
           </div>
         ) : null}
         <div className="actions">
-          <button className="secondary" onClick={openSettings} disabled={indexLoading}>
-            Open VS Code Settings
-          </button>
+          <OpenSettingsButton loading={indexLoading} />
         </div>
         {indexError ? <div className="error">{indexError}</div> : null}
         {indexLoading ? <p className="note">Loading docs index…</p> : null}

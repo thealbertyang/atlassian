@@ -2,10 +2,10 @@ import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import * as vscode from "vscode";
 
 const COMMAND = "bun run dev:webview";
-const OUTPUT_CHANNEL_NAME = "Atlassian Webview Dev";
+const OUTPUT_CHANNEL_NAME = "Atlassian Webview Server";
 const FORCE_KILL_TIMEOUT_MS = 2000;
 
-export class WebviewDevServer implements vscode.Disposable {
+export class WebviewServer implements vscode.Disposable {
   private process?: ChildProcessWithoutNullStreams;
   private output = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
   private lastCwd = "";
@@ -27,7 +27,7 @@ export class WebviewDevServer implements vscode.Disposable {
 
     const env = {
       ...process.env,
-      ATLASSIAN_WEBVIEW_DEV_PORT: String(port),
+      ATLASSIAN_WEBVIEW_PORT: String(port),
     };
 
     const child = spawnDevCommand(cwd, env);

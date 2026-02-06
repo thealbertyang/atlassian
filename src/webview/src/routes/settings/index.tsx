@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAppContext } from "../../contexts/app-context";
+import { ConnectionDetails } from "../../components/ConnectionDetails";
+import { StatusPill } from "../../components/ConnectionPill";
+import { OpenSettingsButton } from "../../components/OpenSettingsButton";
 
 export const Route = createFileRoute("/settings/")({
   component: SettingsPage,
@@ -10,9 +13,7 @@ export const Route = createFileRoute("/settings/")({
 });
 
 function SettingsPage() {
-  const { state, status, openSettings, isWebview, loading } = useAppContext();
-  const authLabel = state.authType === "apiToken" ? "API token" : "Not set";
-  const tokenStorage = state.hasStoredToken ? "Stored in SecretStorage" : "Not stored";
+  const { status, loading } = useAppContext();
 
   return (
     <section className="grid">
@@ -23,36 +24,13 @@ function SettingsPage() {
             <h2>Configuration snapshot</h2>
             <p className="card-sub">Where the current values are coming from.</p>
           </div>
-          <span className="pill pill-muted">{status.source}</span>
+          <StatusPill variant="muted" label={status.source} />
         </div>
-        <div className="kv-grid">
-          <div className="kv">
-            <div className="kv-label">Base URL</div>
-            <div className={`kv-value ${state.baseUrl ? "" : "kv-muted"}`}>
-              {state.baseUrl || "Not set"}
-            </div>
-          </div>
-          <div className="kv">
-            <div className="kv-label">Email</div>
-            <div className={`kv-value ${state.email ? "" : "kv-muted"}`}>
-              {state.email || "Not set"}
-            </div>
-          </div>
-          <div className="kv">
-            <div className="kv-label">Auth mode</div>
-            <div className={`kv-value ${authLabel === "Not set" ? "kv-muted" : ""}`}>
-              {authLabel}
-            </div>
-          </div>
-          <div className="kv">
-            <div className="kv-label">Token storage</div>
-            <div className="kv-value">{tokenStorage}</div>
-          </div>
-        </div>
+        <ConnectionDetails
+          fields={["baseUrl", "email", "authMode", "configSource", "tokenStorage"]}
+        />
         <div className="actions">
-          <button className="secondary" onClick={openSettings} disabled={!isWebview || loading}>
-            Open VS Code Settings
-          </button>
+          <OpenSettingsButton loading={loading} />
         </div>
       </div>
       <div className="card">

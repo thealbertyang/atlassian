@@ -15,6 +15,8 @@ import {
   type RouteHint,
 } from "../../shared/route-contract";
 import { TAB_ROUTES, type TabRoute } from "./route-tabs";
+import { ConnectionPill } from "./components/ConnectionPill";
+import { getSourceLabel } from "./lib/connection-labels";
 import { MASKED_SECRET } from "./constants";
 import "./App.css";
 
@@ -128,24 +130,11 @@ function App({ children }: AppProps) {
 
   const status = useMemo(() => {
     const isConnected = state.apiTokenConfigured;
-    const source =
-      state.configSource === "env.local"
-        ? ".env.local"
-        : state.configSource === "env"
-          ? ".env"
-          : state.configSource === "process.env"
-            ? "Environment"
-            : state.configSource === "settings"
-              ? "Settings"
-              : state.configSource === "mixed"
-                ? "Mixed"
-                : "Not configured";
+    const source = getSourceLabel(state.configSource);
     return { isConnected, source };
   }, [state]);
 
   const issueView = searchParams.get("view") === "compact" ? "compact" : "full";
-  const authLabel = state.authType === "apiToken" ? "API token" : "";
-
   const loadState = async () => {
     if (!isWebview) {
       setLoading(false);
@@ -465,7 +454,17 @@ function App({ children }: AppProps) {
     document.body.removeChild(textArea);
   };
 
-  const tabs = useMemo(() => TAB_ROUTES, []);
+  const [tabs, setTabs] = useState<TabRoute[]>(() => TAB_ROUTES);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<TabRoute[]>).detail;
+      if (detail) {
+        setTabs(detail);
+      }
+    };
+    window.addEventListener("hmr:tab-routes", handler);
+    return () => window.removeEventListener("hmr:tab-routes", handler);
+  }, []);
   const breadcrumbs = useMemo(
     () => buildBreadcrumbs(pathname, tabs, issueKey),
     [pathname, tabs, issueKey],
@@ -514,11 +513,7 @@ function App({ children }: AppProps) {
               leaving VS Code.
             </p>
             <div className="hero-meta">
-              <span className={`pill ${status.isConnected ? "pill-ok" : "pill-warn"}`}>
-                {status.isConnected ? "Connected" : "Not connected"}
-              </span>
-              <span className="pill pill-muted">{status.source}</span>
-              {authLabel ? <span className="pill pill-outline">{authLabel}</span> : null}
+              <ConnectionPill isConnected={status.isConnected} />
             </div>
           </div>
           <div className="hero-actions">

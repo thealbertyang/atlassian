@@ -23,17 +23,10 @@ jobs:
       - name: Install deps
         run: bun install
 
-      - name: Build (tsgo)
-        run: bun run compile
-
-      - name: Package VSIX
-        run: bun run package:extension
-
-      - name: Publish to Marketplace
+      - name: Build + Package + Publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: |
-          node -r ./scripts/patch-os-cpus.js ./node_modules/@vscode/vsce/vsce publish -p "$VSCE_PAT" --skip-duplicate
+        run: bash scripts/release.sh --ci
 
       - name: Create GitHub Release + Upload VSIX
         uses: softprops/action-gh-release@v2

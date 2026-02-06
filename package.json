@@ -29,25 +29,20 @@
 		"src/webview"
 	],
 	"scripts": {
-		"dev": "bun run dev:ext",
+		"dev": "zsh -c 'trap \"kill %1 2>/dev/null\" EXIT; bun run build:ext --watch & bash ./scripts/dev-webview.sh'",
 		"dev:ext": "bun run build:ext --watch",
 		"dev:webview": "bash ./scripts/dev-webview.sh",
-		"install:webview": "bun install --cwd src/webview",
-		"install:all": "bun install && bun install --cwd src/webview",
+		"build": "bun run build:ext && bun run build:webview",
 		"build:ext": "bun build src/extension/extension.ts --outdir out/extension --format=cjs --target=node --external vscode --sourcemap",
+		"build:webview": "bash -lc 'cd src/webview && bun run build'",
 		"typecheck": "tsgo -p ./",
 		"typecheck:watch": "tsgo -watch -p ./",
-		"compile": "bun run typecheck",
-		"compile:watch": "bun run typecheck:watch",
 		"lint": "oxlint src/extension src/webview/src",
 		"format": "oxfmt -w src/extension src/webview/src",
-		"build:webview": "bash -lc 'cd src/webview && bun run build'",
-		"compile:webview": "bun run build:webview",
-		"build": "bun run build:ext && bun run build:webview",
-		"clean:old-modules": "bash -lc 'rm -rf node_modules/.old_modules-*'",
-		"package": "bun run clean:old-modules && NODE_OPTIONS=\"--require ./scripts/patch-os-cpus.cjs\" vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license --no-dependencies",
+		"package": "rm -rf node_modules/.old_modules-* && NODE_OPTIONS=\"--require ./scripts/patch-os-cpus.cjs\" vsce package --out atlassian-sprint-view.vsix --allow-missing-repository --skip-license --no-dependencies",
 		"install:ext": "bun run build && bun run package && code-insiders --uninstall-extension albertyang.atlassian-sprint-view 2>/dev/null; code-insiders --install-extension atlassian-sprint-view.vsix --force",
-		"publish": "bash -lc 'source .env.local 2>/dev/null; NODE_OPTIONS=\"--require ./scripts/patch-os-cpus.cjs\" vsce publish -p \"$VSCE_PAT\"'",
+		"release": "bash ./scripts/release.sh patch",
+		"release:minor": "bash ./scripts/release.sh minor",
 		"vscode:prepublish": "NODE_OPTIONS= bun run build"
 	},
 	"dependencies": {
@@ -183,15 +178,15 @@
 					"default": "",
 					"markdownDescription": "Optional path to a docs directory containing Markdown files. Used by the Docs tab (e.g. `/path/to/docs`)."
 				},
-				"atlassian.webviewDevPath": {
+				"atlassian.webviewPath": {
 					"type": "string",
 					"default": "",
-					"description": "Optional local HTML path for live-refresh webview development. Changes to the file will reload the login panel."
+					"description": "Optional local HTML path for live-refresh webview. Changes to the file will reload the panel."
 				},
-				"atlassian.webviewDevServerUrl": {
+				"atlassian.webviewServerUrl": {
 					"type": "string",
 					"default": "",
-					"description": "Optional dev server URL (e.g. http://localhost:5173) for HMR webview development."
+					"description": "Optional server URL (e.g. http://localhost:5173) for HMR webview loading."
 				}
 			}
 		}

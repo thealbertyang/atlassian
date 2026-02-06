@@ -43,8 +43,8 @@ If you use `.env.local`, run `Atlassian: Sync .env.local to Settings` to copy va
 | `atlassian.apiToken` | Atlassian API token | `""` | Prefer `.env.local` |
 | `atlassian.jql` | JQL used to fetch issues | `assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC` | User intent only |
 | `atlassian.maxResults` | Max issues per refresh | `50` | Keep small for performance |
-| `atlassian.webviewDevPath` | Local HTML path for webview dev | `""` | Live reloads on file change |
-| `atlassian.webviewDevServerUrl` | Dev server URL for HMR | `""` | Example: `http://localhost:5173` |
+| `atlassian.webviewPath` | Local HTML path for webview | `""` | Live reloads on file change |
+| `atlassian.webviewServerUrl` | Server URL for HMR | `""` | Example: `http://localhost:5173` |
 
 ### Environment Overrides
 
@@ -63,10 +63,10 @@ API token env vars:
 - `ATLASSIAN_API_TOKEN`
 - `JIRA_JQL` (optional override for the JQL query)
 
-Webview dev env vars:
+Webview env vars:
 
-- `ATLASSIAN_WEBVIEW_DEV_PATH`
-- `ATLASSIAN_WEBVIEW_DEV_SERVER_URL`
+- `ATLASSIAN_WEBVIEW_PATH`
+- `ATLASSIAN_WEBVIEW_SERVER_URL`
 
 ## Dev Design
 
@@ -81,6 +81,7 @@ Design rules we follow:
 
 Related docs:
 
+- `docs/configuration-matrix.md`
 - `docs/routing-matrix.md`
 - `docs/external-app-matrix.md`
 - `docs/main-app-usage.md`
@@ -89,8 +90,8 @@ Related docs:
 
 If you want fast iteration on the login panel UI, set:
 
-- `atlassian.webviewDevPath` in settings, or
-- `ATLASSIAN_WEBVIEW_DEV_PATH` in `.env.local`
+- `atlassian.webviewPath` in settings, or
+- `ATLASSIAN_WEBVIEW_PATH` in `.env.local`
 
 Point it to a local HTML file (for example: `.../webview/login.html`). The panel will
 reload whenever that file changes. By default, the extension will use
@@ -102,7 +103,7 @@ for extension host changes (tree view logic, API code).
 
 For a richer UI, you can run a local dev server and have the webview load it:
 
-- `ATLASSIAN_WEBVIEW_DEV_SERVER_URL=http://localhost:5173`
+- `ATLASSIAN_WEBVIEW_SERVER_URL=http://localhost:5173`
 - `bun run dev:webview`
 
 Then reopen `Atlassian: Login`. The webview will load the dev server and get HMR.
@@ -151,6 +152,7 @@ Use the provided launch config:
 
 ## Docs
 
+- `docs/configuration-matrix.md` -- full settings, env vars, build modes, HTML resolution, HMR flow
 - `docs/routing-matrix.md`
 - `docs/external-app-matrix.md`
 - `docs/main-app-usage.md`
