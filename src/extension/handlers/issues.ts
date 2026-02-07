@@ -11,6 +11,10 @@ export const createIssueHandlers = ({ client }: IssueDependencies) => ({
     return await client.getIssueDetails(key);
   },
 
+  listIssues: async () => {
+    return await client.searchMyOpenSprintIssues();
+  },
+
   openIssueInBrowser: async (key: string) => {
     if (!key) {
       return;

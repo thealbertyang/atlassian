@@ -3,6 +3,7 @@ import { ConfigurationTarget, Uri, window, workspace } from "vscode";
 import { parseEnvFile } from "../providers/data/atlassian/atlassianConfig";
 import { MASKED_SECRET } from "../constants";
 import { openExtensionSettings } from "../util/open-extension-settings";
+import { SETTINGS_KEYS } from "../../shared/contracts";
 import type { HandlerDependencies } from "./types";
 
 type SettingsDependencies = Pick<HandlerDependencies, "context" | "storage" | "client">;
@@ -29,37 +30,37 @@ export const createSettingsHandlers = ({ context, storage, client }: SettingsDep
       ...parseEnvFile(envLocalPath),
     };
 
-    const updates: Array<{ key: string; value: unknown }> = [];
+    const updates: Array<{ key: string; value: unknown; env: string; sensitive?: boolean }> = [];
 
-    const baseUrl = envData.JIRA_URL || envData.ATLASSIAN_BASE_URL;
-    const email = envData.JIRA_USER_EMAIL || envData.ATLASSIAN_EMAIL;
-    const apiToken = envData.JIRA_API_TOKEN || envData.ATLASSIAN_API_TOKEN;
-    const jql = envData.JIRA_JQL;
+    const baseUrlEnv = envData.JIRA_URL ? "JIRA_URL" : envData.ATLASSIAN_BASE_URL ? "ATLASSIAN_BASE_URL" : null;
+    const emailEnv = envData.JIRA_USER_EMAIL ? "JIRA_USER_EMAIL" : envData.ATLASSIAN_EMAIL ? "ATLASSIAN_EMAIL" : null;
+    const apiTokenEnv = envData.JIRA_API_TOKEN ? "JIRA_API_TOKEN" : envData.ATLASSIAN_API_TOKEN ? "ATLASSIAN_API_TOKEN" : null;
 
-    if (baseUrl) {
-      updates.push({ key: "baseUrl", value: baseUrl });
+    if (baseUrlEnv) {
+      updates.push({ key: SETTINGS_KEYS.BASE_URL, value: envData[baseUrlEnv], env: baseUrlEnv });
     }
-    if (email) {
-      updates.push({ key: "email", value: email });
+    if (emailEnv) {
+      updates.push({ key: SETTINGS_KEYS.EMAIL, value: envData[emailEnv], env: emailEnv });
     }
-    if (apiToken) {
-      updates.push({ key: "apiToken", value: MASKED_SECRET });
+    if (apiTokenEnv) {
+      updates.push({ key: SETTINGS_KEYS.API_TOKEN, value: MASKED_SECRET, env: apiTokenEnv, sensitive: true });
     }
-    if (jql) {
-      updates.push({ key: "jql", value: jql });
+    if (envData.JIRA_JQL) {
+      updates.push({ key: SETTINGS_KEYS.JQL, value: envData.JIRA_JQL, env: "JIRA_JQL" });
     }
 
     if (envData.ATLASSIAN_WEBVIEW_SERVER_URL) {
       updates.push({
-        key: "webviewServerUrl",
+        key: SETTINGS_KEYS.WEBVIEW_SERVER_URL,
         value: envData.ATLASSIAN_WEBVIEW_SERVER_URL,
+        env: "ATLASSIAN_WEBVIEW_SERVER_URL",
       });
     }
     if (envData.ATLASSIAN_WEBVIEW_PATH) {
-      updates.push({ key: "webviewPath", value: envData.ATLASSIAN_WEBVIEW_PATH });
+      updates.push({ key: SETTINGS_KEYS.WEBVIEW_PATH, value: envData.ATLASSIAN_WEBVIEW_PATH, env: "ATLASSIAN_WEBVIEW_PATH" });
     }
     if (envData.ATLASSIAN_DOCS_PATH) {
-      updates.push({ key: "docsPath", value: envData.ATLASSIAN_DOCS_PATH });
+      updates.push({ key: SETTINGS_KEYS.DOCS_PATH, value: envData.ATLASSIAN_DOCS_PATH, env: "ATLASSIAN_DOCS_PATH" });
     }
 
     if (updates.length === 0) {
@@ -80,16 +81,30 @@ export const createSettingsHandlers = ({ context, storage, client }: SettingsDep
       updates.map(({ key, value }) => storage.updateSetting(key, value, target)),
     );
 
+    const baseUrl = baseUrlEnv ? envData[baseUrlEnv] : undefined;
+    const email = emailEnv ? envData[emailEnv] : undefined;
+    const apiToken = apiTokenEnv ? envData[apiTokenEnv] : undefined;
+
     if (baseUrl && email && apiToken) {
       await client.saveApiTokenAuth(baseUrl, email, apiToken);
     } else if (baseUrl || email) {
       await client.updateApiTokenDefaults(baseUrl, email);
     }
 
+    const source = path.basename(envLocalPath);
+
     window.showInformationMessage(
-      `Synced ${updates.length} setting${updates.length === 1 ? "" : "s"} from ${
-        path.basename(envLocalPath)
-      }.`,
+      `Synced ${updates.length} setting${updates.length === 1 ? "" : "s"} from ${source}.`,
     );
+
+    return {
+      count: updates.length,
+      source,
+      items: updates.map(({ env, key, sensitive }) => ({
+        env,
+        setting: key,
+        masked: sensitive ?? false,
+      })),
+    };
   },
 });

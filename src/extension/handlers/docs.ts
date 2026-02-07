@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { Uri, commands, window, workspace } from "vscode";
 import { getDocsPath } from "../providers/data/atlassian/atlassianConfig";
@@ -10,11 +11,20 @@ type DocsDependencies = Pick<HandlerDependencies, "context">;
 type DocsRoot = {
   root: string | null;
   source: DocsSource;
+  workspaceRoot?: string;
+  allowedRealRoots?: string[];
   error?: string;
 };
 
 const RUNBOOKS_DIR = "runbooks";
+const PLANS_DIR = "plans";
+const SKILLS_DIR = "skills";
 const MARKDOWN_EXT = ".md";
+
+const CODEX_HOME = path.join(os.homedir(), ".codex");
+const CLAUDE_HOME = path.join(os.homedir(), ".claude");
+
+const ALLOWED_HIDDEN_DIRS = new Set([".codex-global", ".claude-global"]);
 
 const toTitleCase = (value: string): string =>
   value
@@ -41,6 +51,14 @@ const isFile = (value: string): boolean => {
   }
 };
 
+const realpathOrNull = (value: string): string | null => {
+  try {
+    return fs.realpathSync(value);
+  } catch {
+    return null;
+  }
+};
+
 const normalizeDocId = (value: string): string | null => {
   const trimmed = value.trim().replace(/\\/g, "/");
   if (!trimmed || trimmed.startsWith("/")) {
@@ -51,6 +69,42 @@ const normalizeDocId = (value: string): string | null => {
     return null;
   }
   return normalized;
+};
+
+const isWithinRoots = (roots: string[], target: string): boolean => {
+  const normalizedTarget = path.resolve(target);
+  return roots.some((root) => {
+    const normalizedRoot = path.resolve(root);
+    return (
+      normalizedTarget === normalizedRoot ||
+      normalizedTarget.startsWith(`${normalizedRoot}${path.sep}`)
+    );
+  });
+};
+
+const buildAllowedRealRoots = (docsRoot: string, workspaceRoot?: string): string[] => {
+  const allowed: string[] = [];
+
+  const pushIfDir = (p: string) => {
+    if (!isDirectory(p)) {
+      return;
+    }
+    const real = realpathOrNull(p);
+    if (real) {
+      allowed.push(real);
+    }
+  };
+
+  pushIfDir(docsRoot);
+  if (workspaceRoot) {
+    pushIfDir(workspaceRoot);
+  }
+  pushIfDir(path.join(CODEX_HOME, SKILLS_DIR));
+  pushIfDir(path.join(CODEX_HOME, PLANS_DIR));
+  pushIfDir(path.join(CLAUDE_HOME, SKILLS_DIR));
+  pushIfDir(path.join(CLAUDE_HOME, PLANS_DIR));
+
+  return allowed;
 };
 
 const isWithinRoot = (root: string, target: string): boolean => {
@@ -77,37 +131,67 @@ const resolveConfiguredPath = (value: string, context: DocsDependencies["context
   return path.resolve(context.extensionPath, value);
 };
 
+const WORKSPACE_AGENTS_DIR = "_agents";
+
 const resolveDocsRoot = (context: DocsDependencies["context"]): DocsRoot => {
+  const workspaceFolder =
+    workspace.getWorkspaceFolder(Uri.file(context.extensionPath)) ?? workspace.workspaceFolders?.[0];
+  const workspaceRoot = workspaceFolder?.uri.fsPath;
+
   const configured = getDocsPath();
   if (configured) {
     const resolved = resolveConfiguredPath(configured, context);
     if (isDirectory(resolved)) {
-      return { root: resolved, source: "settings" };
+      return {
+        root: resolved,
+        source: "settings",
+        workspaceRoot,
+        allowedRealRoots: buildAllowedRealRoots(resolved, workspaceRoot),
+      };
     }
     return {
       root: null,
       source: "settings",
+      workspaceRoot,
       error: `Docs path not found: ${resolved}`,
     };
   }
 
-  const extensionDocs = path.join(context.extensionPath, "docs");
-  if (isDirectory(extensionDocs)) {
-    return { root: extensionDocs, source: "extension" };
-  }
-
-  const workspaceFolder =
-    workspace.getWorkspaceFolder(Uri.file(context.extensionPath)) ?? workspace.workspaceFolders?.[0];
   if (workspaceFolder) {
+    const workspaceAgents = path.join(workspaceFolder.uri.fsPath, WORKSPACE_AGENTS_DIR);
+    if (isDirectory(workspaceAgents)) {
+      return {
+        root: workspaceAgents,
+        source: "workspace",
+        workspaceRoot,
+        allowedRealRoots: buildAllowedRealRoots(workspaceAgents, workspaceRoot),
+      };
+    }
     const workspaceDocs = path.join(workspaceFolder.uri.fsPath, "docs");
     if (isDirectory(workspaceDocs)) {
-      return { root: workspaceDocs, source: "workspace" };
+      return {
+        root: workspaceDocs,
+        source: "workspace",
+        workspaceRoot,
+        allowedRealRoots: buildAllowedRealRoots(workspaceDocs, workspaceRoot),
+      };
     }
+  }
+
+  const extensionAgents = path.join(context.extensionPath, WORKSPACE_AGENTS_DIR);
+  if (isDirectory(extensionAgents)) {
+    return {
+      root: extensionAgents,
+      source: "extension",
+      workspaceRoot,
+      allowedRealRoots: buildAllowedRealRoots(extensionAgents, workspaceRoot),
+    };
   }
 
   return {
     root: null,
     source: "none",
+    workspaceRoot,
     error: "No docs directory found. Set atlassian.docsPath to enable Markdown rendering.",
   };
 };
@@ -126,16 +210,84 @@ const readTitle = (filePath: string): string => {
   return fallback;
 };
 
-const listMarkdownEntries = (root: string, group: DocGroup, subdir?: string): DocEntry[] => {
+const ensureSymlink = (symlinkPath: string, targetDir: string): boolean => {
+  if (!isDirectory(targetDir)) {
+    return false;
+  }
+
+  try {
+    const existing = fs.lstatSync(symlinkPath);
+    if (existing.isSymbolicLink()) {
+      const currentTarget = fs.readlinkSync(symlinkPath);
+      if (currentTarget === targetDir) {
+        return true;
+      }
+      fs.unlinkSync(symlinkPath);
+    } else {
+      // Not a symlink: do not overwrite user content.
+      return false;
+    }
+  } catch {
+    // Missing: create it.
+  }
+
+  try {
+    fs.symlinkSync(targetDir, symlinkPath, "dir");
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const ensureAgentExternalRoots = (agentsRoot: string) => {
+  if (path.basename(agentsRoot) !== WORKSPACE_AGENTS_DIR) {
+    return;
+  }
+
+  const skillsDir = path.join(agentsRoot, SKILLS_DIR);
+  const plansDir = path.join(agentsRoot, PLANS_DIR);
+
+  try {
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.mkdirSync(plansDir, { recursive: true });
+  } catch {
+    return;
+  }
+
+  ensureSymlink(path.join(skillsDir, ".codex-global"), path.join(CODEX_HOME, SKILLS_DIR));
+  ensureSymlink(path.join(skillsDir, ".claude-global"), path.join(CLAUDE_HOME, SKILLS_DIR));
+  ensureSymlink(path.join(plansDir, ".codex-global"), path.join(CODEX_HOME, PLANS_DIR));
+  ensureSymlink(path.join(plansDir, ".claude-global"), path.join(CLAUDE_HOME, PLANS_DIR));
+};
+
+const MAX_SCAN_DEPTH = 4;
+
+const listMarkdownEntries = (
+  root: string,
+  group: DocGroup,
+  subdir?: string,
+  depth = 0,
+  seen = new Set<string>(),
+): DocEntry[] => {
+  if (depth > MAX_SCAN_DEPTH) {
+    return [];
+  }
   const dirPath = subdir ? path.join(root, subdir) : root;
   if (!isDirectory(dirPath)) {
     return [];
   }
+  const realDir = realpathOrNull(dirPath);
+  if (realDir) {
+    if (seen.has(realDir)) {
+      return [];
+    }
+    seen.add(realDir);
+  }
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isFile())
+  const files: DocEntry[] = entries
+    .filter((entry) => isFile(path.join(dirPath, entry.name)))
     .filter((entry) => entry.name.toLowerCase().endsWith(MARKDOWN_EXT))
-    .filter((entry) => !entry.name.startsWith("_"))
+    .filter((entry) => !entry.name.startsWith("_") && !entry.name.startsWith("."))
     .map((entry) => {
       const relativePath = subdir ? path.join(subdir, entry.name) : entry.name;
       const id = toPosix(relativePath);
@@ -146,11 +298,26 @@ const listMarkdownEntries = (root: string, group: DocGroup, subdir?: string): Do
         group,
         relativePath: toPosix(relativePath),
       } satisfies DocEntry;
+    });
+  const subdirs = entries
+    .filter((entry) => {
+      if (entry.name.startsWith("_")) {
+        return false;
+      }
+      if (entry.name.startsWith(".")) {
+        return ALLOWED_HIDDEN_DIRS.has(entry.name);
+      }
+      return true;
     })
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .filter((entry) => isDirectory(path.join(dirPath, entry.name)));
+  for (const dir of subdirs) {
+    const childSubdir = subdir ? path.join(subdir, dir.name) : dir.name;
+    files.push(...listMarkdownEntries(root, group, childSubdir, depth + 1, seen));
+  }
+  return files.sort((a, b) => a.title.localeCompare(b.title));
 };
 
-const resolveDocPath = (root: string, id: string): string | null => {
+const resolveDocPath = (root: string, allowedRealRoots: string[], id: string): string | null => {
   const normalized = normalizeDocId(id);
   if (!normalized) {
     return null;
@@ -163,11 +330,20 @@ const resolveDocPath = (root: string, id: string): string | null => {
   if (!target.toLowerCase().endsWith(MARKDOWN_EXT)) {
     return null;
   }
+
+  if (allowedRealRoots.length > 0) {
+    const realTarget = realpathOrNull(target);
+    if (!realTarget || !isWithinRoots(allowedRealRoots, realTarget)) {
+      return null;
+    }
+  }
+
   return target;
 };
 
 const resolveAssetPath = (
   root: string,
+  allowedRealRoots: string[],
   baseId: string,
   href: string,
 ): { path: string; withinRoot: boolean } | null => {
@@ -186,7 +362,7 @@ const resolveAssetPath = (
       return cleaned;
     }
   })();
-  const basePath = resolveDocPath(root, baseId);
+  const basePath = resolveDocPath(root, allowedRealRoots, baseId);
   if (!basePath) {
     return null;
   }
@@ -206,22 +382,39 @@ export const createDocsHandlers = ({ context }: DocsDependencies) => ({
       };
     }
 
-    const docs = listMarkdownEntries(root, "docs");
-    const runbooks = listMarkdownEntries(root, "runbooks", RUNBOOKS_DIR);
+    // If we're using the workspace/extension _agents root, wire in external Codex/Claude
+    // content via symlinks so the UI can browse them.
+    ensureAgentExternalRoots(root);
+
+    const all = listMarkdownEntries(root, "docs");
+    // Classify entries by subdir.
+    for (const entry of all) {
+      if (entry.relativePath.startsWith(`${RUNBOOKS_DIR}/`)) {
+        entry.group = "runbooks";
+        continue;
+      }
+      if (entry.relativePath.startsWith(`${PLANS_DIR}/`)) {
+        entry.group = "plans";
+        continue;
+      }
+      if (entry.relativePath.startsWith(`${SKILLS_DIR}/`)) {
+        entry.group = "skills";
+      }
+    }
 
     return {
       root,
       source,
-      entries: [...docs, ...runbooks],
+      entries: all,
     };
   },
 
   getDocContent: async (id: string): Promise<DocContent | null> => {
-    const { root } = resolveDocsRoot(context);
+    const { root, allowedRealRoots } = resolveDocsRoot(context);
     if (!root) {
       return null;
     }
-    const filePath = resolveDocPath(root, id);
+    const filePath = resolveDocPath(root, allowedRealRoots ?? [], id);
     if (!filePath || !isFile(filePath)) {
       return null;
     }
@@ -234,32 +427,40 @@ export const createDocsHandlers = ({ context }: DocsDependencies) => ({
     };
   },
 
+  openDocInEditor: async (id: string): Promise<boolean> => {
+    const { root, allowedRealRoots } = resolveDocsRoot(context);
+    if (!root) {
+      return false;
+    }
+    const filePath = resolveDocPath(root, allowedRealRoots ?? [], id);
+    if (!filePath || !isFile(filePath)) {
+      return false;
+    }
+    await commands.executeCommand("revealInExplorer", Uri.file(filePath));
+    return true;
+  },
+
   revealDocAsset: async (baseId: string, href: string): Promise<boolean> => {
-    const { root } = resolveDocsRoot(context);
+    const { root, allowedRealRoots } = resolveDocsRoot(context);
     if (!root) {
       window.showWarningMessage("Docs folder is not configured.");
       return false;
     }
-    const resolved = resolveAssetPath(root, baseId, href);
+    const allowed = allowedRealRoots ?? [];
+    const resolved = resolveAssetPath(root, allowed, baseId, href);
     if (!resolved) {
       window.showWarningMessage("Unable to resolve the linked file.");
       return false;
     }
 
-    const workspaceFolder =
-      workspace.getWorkspaceFolder(Uri.file(context.extensionPath)) ??
-      workspace.workspaceFolders?.[0];
-    const workspaceRoot = workspaceFolder?.uri.fsPath;
-    const withinWorkspace = workspaceRoot ? isWithinRoot(workspaceRoot, resolved.path) : false;
-    const withinDocsRoot = resolved.withinRoot;
-
-    if (!withinWorkspace && !withinDocsRoot) {
-      window.showWarningMessage("Linked file is outside the workspace.");
+    if (!fs.existsSync(resolved.path)) {
+      window.showWarningMessage(`File not found: ${resolved.path}`);
       return false;
     }
 
-    if (!fs.existsSync(resolved.path)) {
-      window.showWarningMessage(`File not found: ${resolved.path}`);
+    const realTarget = realpathOrNull(resolved.path) ?? resolved.path;
+    if (allowed.length > 0 && !isWithinRoots(allowed, realTarget)) {
+      window.showWarningMessage("Linked file is outside the allowed roots.");
       return false;
     }
 

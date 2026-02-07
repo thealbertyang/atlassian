@@ -20,10 +20,12 @@
     "github-markdown-css": "^5.9.0",
     "marked": "^12.0.2",
     "mermaid": "^10.9.0",
+    "nuqs": "^2.8.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@tanstack/router-plugin": "^1.158.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
@@ -34,7 +36,6 @@
     "eslint-plugin-react-refresh": "^0.4.4",
     "typescript": "^5.2.2",
     "vite": "^7.3.1",
-    "vite-plugin-vscode-webview-hmr": "^1.0.1",
-    "@tanstack/router-plugin": "^1.158.1"
+    "vite-plugin-vscode-webview-hmr": "^1.0.1"
   }
 }

@@ -4,6 +4,7 @@ import {
   getApiTokenConfigSource,
 } from "../providers/data/atlassian/atlassianConfig";
 import { MASKED_SECRET } from "../constants";
+import { SETTINGS_KEYS, type WebviewState } from "../../shared/contracts";
 import type { HandlerDependencies } from "./types";
 
 type AuthDependencies = Pick<
@@ -19,7 +20,7 @@ export const createAuthHandlers = ({
   buildWatcher,
   renderTracker,
 }: AuthDependencies) => {
-  const getState = async () => {
+  const getState = async (): Promise<WebviewState> => {
     const defaults = await client.getApiTokenDefaults();
     const envApiConfig = getApiTokenConfig();
     const hasStoredToken = await client.hasStoredApiToken();
@@ -73,9 +74,9 @@ export const createAuthHandlers = ({
           ? ConfigurationTarget.Workspace
           : ConfigurationTarget.Global;
       await Promise.all([
-        storage.updateSetting("baseUrl", baseUrl, target),
-        storage.updateSetting("email", email, target),
-        storage.updateSetting("apiToken", MASKED_SECRET, target),
+        storage.updateSetting(SETTINGS_KEYS.BASE_URL, baseUrl, target),
+        storage.updateSetting(SETTINGS_KEYS.EMAIL, email, target),
+        storage.updateSetting(SETTINGS_KEYS.API_TOKEN, MASKED_SECRET, target),
       ]);
 
       provider.refresh();

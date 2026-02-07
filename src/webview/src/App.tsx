@@ -1,34 +1,53 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { flushSync } from "react-dom";
 import { useHandlers } from "./hooks/use-handlers";
-import { getVsCodeApi } from "./contexts/jsonrpc-rx-context";
+import { useNavHistory } from "./hooks/use-nav-history";
+import { getVsCodeApi, isWebview as isWebviewStatic, isBridgeConnected } from "./contexts/jsonrpc-rx-context";
 import { AppContextProvider, type FormState } from "./contexts/app-context";
 import type { JiraIssueDetails, WebviewState } from "./types/handlers";
+import type { JiraIssueSummary } from "@shared/contracts";
+import type { UniversalConfig, UniversalStage } from "@shared/universal";
+import { DEFAULT_UNIVERSAL_CONFIG } from "@shared/universal";
 import { createWebviewIpc } from "./ipc";
-import { IPC_COMMANDS, IPC_EVENTS } from "../../shared/ipc-contract";
 import {
+  IPC_COMMANDS,
+  IPC_EVENTS,
   DEFAULT_ROUTE_PATH,
   extractIssueKey,
   normalizeRoutePath,
   routeHintToPath,
+  stageFromPath,
+  buildDeepLinkBase,
+  buildDeepLinkUrl,
+  buildAppDispatcherPath,
+  isAppDispatcherPath,
   type RouteHint,
-} from "../../shared/route-contract";
-import { TAB_ROUTES, type TabRoute } from "./route-tabs";
-import { ConnectionPill } from "./components/ConnectionPill";
+} from "@shared/contracts";
+import { StageLayout } from "./components/StageLayout";
+import { AppOverlay } from "./components/AppOverlay";
+import { AppToast, type ToastData } from "./components/AppToast";
 import { getSourceLabel } from "./lib/connection-labels";
 import { MASKED_SECRET } from "./constants";
+import { toSearchParams } from "./lib/to-search-params";
+import { sanitizeSearchParams } from "./lib/sanitize-query";
 import "./App.css";
 
 type AppProps = {
   children: ReactNode;
 };
 
-type RouteName = string;
-
-type Breadcrumb = {
-  label: string;
-  path: string;
+const applyUniversalStyles = (config: UniversalConfig | null) => {
+  if (!config?.styles?.cssVariables) {
+    return;
+  }
+  const root = document.documentElement;
+  Object.entries(config.styles.cssVariables).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      root.style.setProperty(key, value);
+    }
+  });
 };
 
 type PersistedRouteState = {
@@ -55,30 +74,11 @@ const EMPTY_STATE: WebviewState = {
   uriScheme: "",
 };
 
-const isWebview =
-  typeof window !== "undefined" && typeof (window as any).acquireVsCodeApi === "function";
-
 const formatTimestamp = (value: number | null | undefined) => {
   if (!value) {
     return "Not set";
   }
   return new Date(value).toLocaleString();
-};
-
-const toSearchParams = (value: unknown): URLSearchParams => {
-  if (value instanceof URLSearchParams) {
-    return value;
-  }
-  if (typeof value === "string") {
-    return new URLSearchParams(value);
-  }
-  if (value && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== undefined && v !== null)
-      .map(([k, v]) => [k, String(v)] as [string, string]);
-    return new URLSearchParams(entries);
-  }
-  return new URLSearchParams();
 };
 
 const readPersistedRoute = (state: unknown) => {
@@ -93,7 +93,7 @@ const readPersistedRoute = (state: unknown) => {
   if (!rawPath) {
     return null;
   }
-  const queryParams = toSearchParams(persisted.query ?? persisted.search ?? {});
+  const queryParams = sanitizeSearchParams(toSearchParams(persisted.query ?? persisted.search ?? {}));
   return {
     path: normalizeRoutePath(String(rawPath)),
     query: Object.fromEntries(queryParams.entries()) as Record<string, string>,
@@ -101,13 +101,39 @@ const readPersistedRoute = (state: unknown) => {
   };
 };
 
+const getStagesArray = (config: UniversalConfig | null): UniversalStage[] => {
+  const stages = config?.stages ?? DEFAULT_UNIVERSAL_CONFIG.stages ?? {};
+  return Object.values(stages).sort((a, b) => a.order - b.order);
+};
+
 function App({ children }: AppProps) {
   const handlers = useHandlers();
   const navigate = useNavigate();
+  const router = useRouter();
   const location = useRouterState({ select: (state) => state.location });
+  const navHistory = useNavHistory();
   const ipcRef = useRef<ReturnType<typeof createWebviewIpc> | null>(null);
   const initialRouteApplied = useRef(false);
   const initialRouteTargetRef = useRef<{ path: string; search: string } | null>(null);
+
+  const [isWebview, setIsWebview] = useState(isWebviewStatic);
+  const [wsAuthFailed, setWsAuthFailed] = useState(false);
+
+  useEffect(() => {
+    if (isWebviewStatic) return;
+    const onBridgeConnected = () => {
+      setWsAuthFailed(false);
+      setIsWebview(true);
+    };
+    const onBridgeAuthFailed = () => setWsAuthFailed(true);
+    window.addEventListener("ws-bridge-connected", onBridgeConnected);
+    window.addEventListener("ws-bridge-auth-failed", onBridgeAuthFailed);
+    if (isBridgeConnected()) setIsWebview(true);
+    return () => {
+      window.removeEventListener("ws-bridge-connected", onBridgeConnected);
+      window.removeEventListener("ws-bridge-auth-failed", onBridgeAuthFailed);
+    };
+  }, []);
 
   const [state, setState] = useState<WebviewState>(EMPTY_STATE);
   const [form, setForm] = useState<FormState>({
@@ -117,15 +143,19 @@ function App({ children }: AppProps) {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const [sprintIssues, setSprintIssues] = useState<JiraIssueSummary[]>([]);
+  const [sprintIssuesLoading, setSprintIssuesLoading] = useState(false);
   const [issue, setIssue] = useState<JiraIssueDetails | null>(null);
   const [issueLoading, setIssueLoading] = useState(false);
   const [issueError, setIssueError] = useState("");
+  const [universalConfig, setUniversalConfig] = useState<UniversalConfig | null>(null);
 
   const pathname = normalizeRoutePath(location.pathname || DEFAULT_ROUTE_PATH);
-  const searchParams = useMemo(() => toSearchParams(location.search), [location.search]);
+  const searchParams = useMemo(() => sanitizeSearchParams(toSearchParams(location.search)), [location.search]);
+  const currentStage = stageFromPath(pathname);
   const pathSegments = pathname.split("/").filter(Boolean);
-  const activeSegment = pathSegments[0] || "overview";
-  const routeName = activeSegment as RouteName;
+  const routeName = pathSegments[0] || "plan";
   const issueKey = extractIssueKey(pathname)?.toUpperCase();
 
   const status = useMemo(() => {
@@ -135,6 +165,11 @@ function App({ children }: AppProps) {
   }, [state]);
 
   const issueView = searchParams.get("view") === "compact" ? "compact" : "full";
+
+  const stages = useMemo(() => getStagesArray(universalConfig), [universalConfig]);
+  const currentStageConfig = stages.find((s) => s.id === currentStage);
+  const stageLabel = currentStageConfig?.label ?? "Plan";
+
   const loadState = async () => {
     if (!isWebview) {
       setLoading(false);
@@ -160,7 +195,30 @@ function App({ children }: AppProps) {
 
   useEffect(() => {
     void loadState();
-  }, []);
+  }, [isWebview]);
+
+  useEffect(() => {
+    if (!isWebview) {
+      return;
+    }
+    let cancelled = false;
+    const loadUniversalConfig = async () => {
+      try {
+        const config = await handlers.getUniversalConfig();
+        if (cancelled) {
+          return;
+        }
+        setUniversalConfig(config);
+        applyUniversalStyles(config);
+      } catch {
+        // ignore config failures to avoid blocking UI
+      }
+    };
+    void loadUniversalConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, [handlers, isWebview]);
 
   useEffect(() => {
     if (!isWebview || initialRouteApplied.current) {
@@ -170,7 +228,7 @@ function App({ children }: AppProps) {
     if (hint) {
       initialRouteApplied.current = true;
       const target = normalizeRoutePath(routeHintToPath(hint));
-      const queryParams = toSearchParams(hint.query ?? {});
+      const queryParams = sanitizeSearchParams(toSearchParams(hint.query ?? {}));
       initialRouteTargetRef.current = {
         path: target,
         search: queryParams.toString(),
@@ -221,13 +279,27 @@ function App({ children }: AppProps) {
         navigate({ to: target, search: hint.query ?? {} });
       }
     });
+    const disposeStateUpdated = ipc.onCommand(IPC_COMMANDS.STATE_UPDATED, (payload) => {
+      const patch = payload as { dev?: Partial<WebviewState["dev"]> } | undefined;
+      if (patch?.dev) {
+        setState((prev) => ({
+          ...prev,
+          dev: { ...prev.dev, ...patch.dev } as WebviewState["dev"],
+        }));
+      }
+    });
     ipc.sendEvent(IPC_EVENTS.WEBVIEW_READY);
     return () => {
       disposeNavigate();
+      disposeStateUpdated();
       ipc.dispose();
       ipcRef.current = null;
     };
   }, [navigate]);
+
+  useEffect(() => {
+    navHistory.push(pathname);
+  }, [pathname]);
 
   useEffect(() => {
     if (!isWebview || !ipcRef.current) {
@@ -269,7 +341,7 @@ function App({ children }: AppProps) {
     if (!isWebview) {
       return;
     }
-    if (routeName !== "jira" || !issueKey) {
+    if (routeName !== "review" || !issueKey) {
       setIssue(null);
       setIssueError("");
       return;
@@ -306,6 +378,35 @@ function App({ children }: AppProps) {
     };
   }, [handlers, issueKey, routeName]);
 
+  // Load sprint issues list when on review route without a specific issue
+  useEffect(() => {
+    if (!isWebview || routeName !== "review" || issueKey) {
+      return;
+    }
+    let cancelled = false;
+    setSprintIssuesLoading(true);
+    handlers
+      .listIssues()
+      .then((result) => {
+        if (!cancelled) {
+          setSprintIssues(result ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSprintIssues([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSprintIssuesLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [handlers, issueKey, routeName, isWebview]);
+
   const updateForm = (key: keyof FormState) => (event: ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
   };
@@ -333,7 +434,13 @@ function App({ children }: AppProps) {
 
   const syncEnv = async () => {
     setError("");
-    await handlers.syncEnvToSettings();
+    const result = await handlers.syncEnvToSettings();
+    if (result?.items) {
+      setToast({
+        title: `Synced ${result.count} setting${result.count === 1 ? "" : "s"} from ${result.source}`,
+        items: result.items,
+      });
+    }
     await loadState();
   };
 
@@ -357,24 +464,101 @@ function App({ children }: AppProps) {
     await handlers.reinstallExtension();
   };
 
+  const startDevTaskTerminal = async () => {
+    setError("");
+    await handlers.startDevTaskTerminal();
+  };
+
+  const buildExtension = async () => {
+    setError("");
+    await handlers.buildExtension();
+  };
+
+  const buildWebview = async () => {
+    setError("");
+    await handlers.buildWebview();
+  };
+
   const openSettings = async () => {
     setError("");
     await handlers.openSettings();
   };
 
+  const handleGoBack = useCallback(() => {
+    const path = navHistory.goBack();
+    if (path) {
+      navigate({ to: path, replace: true });
+      navHistory.clearNavigating();
+    }
+  }, [navigate, navHistory]);
+
+  const handleGoForward = useCallback(() => {
+    const path = navHistory.goForward();
+    if (path) {
+      navigate({ to: path, replace: true });
+      navHistory.clearNavigating();
+    }
+  }, [navigate, navHistory]);
+
   const navigateTo = useCallback(
     (nextPath: string) => {
-      navigate({ to: normalizeRoutePath(nextPath) });
+      const raw = String(nextPath ?? "").trim();
+      if (!raw) {
+        return;
+      }
+      const [pathPart, queryPart] = raw.split("?");
+      const to = normalizeRoutePath(pathPart);
+      const doNavigate = () => {
+        if (queryPart) {
+          const search = Object.fromEntries(sanitizeSearchParams(new URLSearchParams(queryPart)).entries());
+          navigate({ to, search });
+          return;
+        }
+        navigate({ to });
+      };
+      const doc = document as unknown as { startViewTransition?: (cb: () => void) => unknown };
+      if (typeof doc.startViewTransition === "function") {
+        doc.startViewTransition(() => flushSync(doNavigate));
+      } else {
+        doNavigate();
+      }
     },
     [navigate],
   );
 
+  const refreshPage = useCallback(() => {
+    const doc = document as unknown as { startViewTransition?: (cb: () => void) => unknown };
+    const doRefresh = () => router.invalidate();
+    if (typeof doc.startViewTransition === "function") {
+      doc.startViewTransition(() => {
+        flushSync(doRefresh);
+      });
+    } else {
+      doRefresh();
+    }
+  }, [router]);
+
+  const openPaletteFromUrlBar = useCallback(
+    (query?: string) => {
+      window.dispatchEvent(
+        new CustomEvent("atlassian:commandPalette", {
+          detail: {
+            source: "urlbar",
+            query: typeof query === "string" ? query : "",
+            returnFocus: true,
+          },
+        }),
+      );
+    },
+    [],
+  );
+
   const setIssueView = (view: "compact" | "full") => {
-    if (routeName !== "jira" || !issueKey) {
+    if (routeName !== "review" || !issueKey) {
       return;
     }
     navigate({
-      to: `/jira/issues/${issueKey}`,
+      to: `/review/issues/${issueKey}`,
       search: (prev) => {
         const next = {
           ...(typeof prev === "object" && prev ? prev : {}),
@@ -420,14 +604,30 @@ function App({ children }: AppProps) {
       });
   }, [handlers, issueKey]);
 
-  const deepLinkBase =
-    state.uriScheme && state.extensionId
-      ? `${state.uriScheme}://${state.extensionId}`
-      : "vscode://albertyang.atlassian-sprint-view";
-  const deepPath = pathname === "/" ? "/open" : `/open${pathname}`;
-  const deepLinkUrl = `${deepLinkBase}${deepPath}${
-    searchParams.toString() ? `?${searchParams}` : ""
-  }`;
+  const appId = universalConfig?.app.id ?? DEFAULT_UNIVERSAL_CONFIG.app.id ?? "atlassian";
+  // Show a link that's "native" to the current *surface*:
+  // - VS Code webview surface: `${uriScheme}://${extensionId}/app/...`
+  // - Browser surface (even if WS bridge is connected): `http://localhost:5173/#/app/...`
+  //
+  // Note: WS bridge connectivity should enable actions, but should not change the preferred
+  // shareable URL shape (otherwise browser links flip to vscode:// unexpectedly).
+  const deepLinkBase = useMemo(() => {
+    if (isWebviewStatic) {
+      return buildDeepLinkBase(state.uriScheme, state.extensionId);
+    }
+    try {
+      // Keep the hash router stable across servers and paths.
+      return `${window.location.origin}${window.location.pathname}#`;
+    } catch {
+      return buildDeepLinkBase(state.uriScheme, state.extensionId);
+    }
+  }, [state.extensionId, state.uriScheme]);
+  // Build the deep link path: wrap the current route in the dispatcher format unless
+  // already wrapped (e.g., when on the /app/$appId/... dispatcher page itself).
+  const deepLinkPath = isAppDispatcherPath(pathname)
+    ? pathname
+    : buildAppDispatcherPath(appId, pathname);
+  const deepLinkUrl = buildDeepLinkUrl(deepLinkBase, deepLinkPath, Object.fromEntries(searchParams.entries()));
 
   const copyDeepLink = async () => {
     try {
@@ -454,22 +654,6 @@ function App({ children }: AppProps) {
     document.body.removeChild(textArea);
   };
 
-  const [tabs, setTabs] = useState<TabRoute[]>(() => TAB_ROUTES);
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<TabRoute[]>).detail;
-      if (detail) {
-        setTabs(detail);
-      }
-    };
-    window.addEventListener("hmr:tab-routes", handler);
-    return () => window.removeEventListener("hmr:tab-routes", handler);
-  }, []);
-  const breadcrumbs = useMemo(
-    () => buildBreadcrumbs(pathname, tabs, issueKey),
-    [pathname, tabs, issueKey],
-  );
-
   return (
     <AppContextProvider
       value={{
@@ -491,7 +675,12 @@ function App({ children }: AppProps) {
         reloadWebviews,
         reinstallExtension,
         restartExtensionHost,
+        startDevTaskTerminal,
+        buildExtension,
+        buildWebview,
         formatTimestamp,
+        sprintIssues,
+        sprintIssuesLoading,
         issue,
         issueLoading,
         issueError,
@@ -502,118 +691,85 @@ function App({ children }: AppProps) {
         refreshIssue,
         navigate: navigateTo,
         routeName,
+        currentStage,
+        universalConfig,
       }}
     >
-      <div className="app">
-        <header className="hero">
-          <div className="hero-content">
-            <div className="hero-title">Atlassian Sprint</div>
-            <p className="hero-sub">
-              Connect your Jira workspace, tune sprint settings, and run dev tooling without
-              leaving VS Code.
-            </p>
-            <div className="hero-meta">
-              <ConnectionPill isConnected={status.isConnected} />
-            </div>
-          </div>
-          <div className="hero-actions">
-            {status.isConnected ? (
-              <button className="danger" onClick={disconnect} disabled={loading}>
-                Disconnect
-              </button>
-            ) : (
-              <button onClick={() => navigateTo("/setup")} disabled={loading}>
-                Configure
-              </button>
-            )}
-          </div>
-        </header>
-
-        <section className="deep-link-bar" aria-label="Deep link">
-          <div>
-            <div className="eyebrow">Deep link</div>
-            <div className="deep-link-url">{deepLinkUrl}</div>
-          </div>
-          <button className="secondary" onClick={copyDeepLink} disabled={!isWebview}>
-            Copy link
-          </button>
-        </section>
-
-        <nav className="tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab.segment}
-              type="button"
-              className={`tab ${activeSegment === tab.segment ? "active" : ""}`}
-              onClick={() => navigateTo(tab.path)}
-            >
-              {tab.label}
+      <StageLayout
+        stages={stages}
+        activeStage={currentStage}
+        currentPath={pathname}
+        deepLinkUrl={deepLinkUrl}
+        onNavigate={navigateTo}
+        onCopy={copyDeepLink}
+        onRefresh={refreshPage}
+        onOpenPalette={openPaletteFromUrlBar}
+        canGoBack={navHistory.canGoBack}
+        canGoForward={navHistory.canGoForward}
+        onGoBack={handleGoBack}
+        onGoForward={handleGoForward}
+        headerActions={
+          !status.isConnected ? (
+            <button className="secondary" onClick={() => navigateTo("/system/settings")} disabled={loading}>
+              Configure
             </button>
-          ))}
-        </nav>
-
-        {breadcrumbs.length > 1 ? (
-          <nav className="breadcrumbs" aria-label="Breadcrumb">
-            {breadcrumbs.map((crumb, index) => (
-              <span key={`${crumb.path}-${index}`} className="crumb-item">
-                <button type="button" className="crumb" onClick={() => navigateTo(crumb.path)}>
-                  {crumb.label}
-                </button>
-                {index < breadcrumbs.length - 1 ? <span className="crumb-sep">/</span> : null}
-              </span>
-            ))}
-          </nav>
-        ) : null}
-
+          ) : currentStage === "review" && issueKey ? (
+            <>
+              <button type="button" className="secondary" onClick={openIssueInBrowser} disabled={!isWebview}>
+                Open in Jira
+              </button>
+              <button type="button" className="secondary" onClick={refreshIssue} disabled={!isWebview || issueLoading}>
+                Refresh
+              </button>
+            </>
+          ) : null
+        }
+      >
         {error ? <div className="error">{error}</div> : null}
         {!isWebview ? (
-          <div className="card">
+          <div className="section">
             <h2>Webview Unavailable</h2>
             <p className="note">
               This UI is running outside VS Code. Open the extension webview panel to connect to
               Atlassian and use the dev controls.
             </p>
+            {wsAuthFailed ? (
+              <p className="note">
+                WS bridge auth failed. Open the extension in VS Code and copy the WS bridge token
+                from System {">"} Registry (or Settings {">"} Internals), then reload this page with{" "}
+                <code>?wsToken=...</code>.
+              </p>
+            ) : null}
           </div>
         ) : null}
 
         {children}
-      </div>
+      </StageLayout>
+
+      <AppOverlay
+        isConnected={status.isConnected}
+        stageLabel={stageLabel}
+        currentStage={currentStage}
+        devMode={state.devMode}
+        lastExtensionBuildAt={state.dev?.lastExtensionBuildAt}
+        isWebview={isWebview}
+        onNavigate={navigateTo}
+        onCopyDeepLink={copyDeepLink}
+        onOpenSettings={openSettings}
+        onSyncEnv={syncEnv}
+        onRefreshIssue={issueKey ? refreshIssue : undefined}
+        onOpenIssueInBrowser={issueKey ? openIssueInBrowser : undefined}
+        onRunDevWebview={runDevWebview}
+        onReloadWebviews={reloadWebviews}
+        onReinstallExtension={reinstallExtension}
+        onRestartExtensionHost={restartExtensionHost}
+        onStartTaskTerminal={startDevTaskTerminal}
+        onSaveToken={saveToken}
+      />
+
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </AppContextProvider>
   );
 }
 
 export default App;
-
-const buildBreadcrumbs = (
-  path: string,
-  tabs: TabRoute[],
-  issueKey?: string,
-): Breadcrumb[] => {
-  const segments = path.split("/").filter(Boolean);
-  if (segments.length === 0) {
-    return [];
-  }
-  const crumbs: Breadcrumb[] = [];
-  const tabMap = new Map(tabs.map((tab) => [tab.segment, tab]));
-  segments.forEach((segment, index) => {
-    const isRoot = index === 0;
-    const routePath = `/${segments.slice(0, index + 1).join("/")}`;
-    let label = segment;
-    if (isRoot) {
-      label = tabMap.get(segment)?.label ?? titleCase(segment);
-    } else if (issueKey && segments[0] === "jira" && segments[1] === "issues" && index === 2) {
-      label = issueKey;
-    } else {
-      label = titleCase(segment);
-    }
-    crumbs.push({ label, path: routePath });
-  });
-  return crumbs;
-};
-
-const titleCase = (value: string): string =>
-  value
-    .split(/[-_]/g)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");

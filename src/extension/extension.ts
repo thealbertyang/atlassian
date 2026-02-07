@@ -4,16 +4,31 @@ import { AtlassianIssuesProvider } from "./providers/data/atlassian/issueProvide
 import { getHandlers } from "./handlers";
 import { log, outputChannel } from "./providers/data/atlassian/logger";
 import { WebviewServer } from "./service/webview-dev-server";
+import { WebviewWsBridge } from "./service/webview-ws-bridge";
 import { ExtensionBuildWatcher } from "./service/extension-build-watcher";
 import { ExtensionInstaller } from "./service/extension-installer";
 import { AtlassianUriHandler } from "./service/uri-handler";
 import type { WebviewRoute } from "./service/webview-route";
 import { WebviewRenderTracker } from "./service/webview-render-tracker";
 import { ViewProviderPanel } from "./providers/view/view-provider-panel";
-import { DEFAULT_WEBVIEW_PORT, REOPEN_APP_AFTER_RESTART_KEY } from "./constants";
+import {
+  DEFAULT_WEBVIEW_PORT,
+  DEFAULT_WS_BRIDGE_HOST,
+  DEFAULT_WS_BRIDGE_PORT,
+  REOPEN_APP_AFTER_RESTART_KEY,
+} from "./constants";
 import { resolveWebviewRoot } from "./webview/paths";
 import { StorageService } from "./service/storage-service";
+import { scaffoldAgentsDir } from "./service/agents-scaffold";
+import { getOrCreateWsBridgeToken } from "./service/ws-bridge-auth";
 import { getWebviewServerUrl } from "./providers/data/atlassian/atlassianConfig";
+import { AppGlobalStateService } from "./service/app-global-state-service";
+import {
+  VSCODE_COMMANDS,
+  IPC_COMMANDS,
+  formatLogPayload,
+  getActionByVscodeCommand,
+} from "../shared/contracts";
 import {
   getServerPort,
   isLocalhostUrl,
@@ -26,11 +41,14 @@ export function activate(context: vscode.ExtensionContext): void {
   log("Atlassian Sprint extension activating...");
   log(`Extension path: ${context.extensionPath}`);
 
+  scaffoldAgentsDir(context);
+
   const storage = new StorageService(context, "atlassian");
   const client = new AtlassianClient(context, storage);
   const provider = new AtlassianIssuesProvider(client);
   const webviewServer = new WebviewServer();
   const buildWatcher = new ExtensionBuildWatcher();
+  buildWatcher.seedFromDisk(context.extensionPath);
   const extensionInstaller = new ExtensionInstaller();
   const renderTracker = new WebviewRenderTracker();
 
@@ -101,7 +119,23 @@ export function activate(context: vscode.ExtensionContext): void {
     closeApp: closeAppPanel,
   });
 
+  const appGlobalState = new AppGlobalStateService(context, {
+    getUniversalConfig: handlers.getUniversalConfig,
+    getFullConfig: handlers.getFullConfig as any,
+    getState: handlers.getState,
+  });
+  appGlobalState.start();
+
+  let wsBridge: WebviewWsBridge | null = null;
+
   viewProvider = new ViewProviderPanel(context, handlers, renderTracker);
+  context.subscriptions.push(
+    buildWatcher.onDidBuild((timestamp) => {
+      viewProvider?.sendCommand(IPC_COMMANDS.STATE_UPDATED, {
+        dev: { lastExtensionBuildAt: timestamp },
+      });
+    }),
+  );
   context.subscriptions.push(
     vscode.window.registerWebviewPanelSerializer(ViewProviderPanel.viewType, {
       async deserializeWebviewPanel(webviewPanel) {
@@ -119,28 +153,75 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
   );
 
-  registerTreeProvider(context, provider);
+  context.subscriptions.push(appGlobalState);
 
-  if (context.extensionMode === vscode.ExtensionMode.Development) {
-    buildWatcher.start(context.extensionPath);
-  }
+  registerTreeProvider(context, provider);
 
   const configuredUrl = normalizeServerUrl(getWebviewServerUrl());
   const cwd = resolveWebviewRoot(context.extensionPath);
-  if (cwd) {
-    const devUrl = configuredUrl || `http://localhost:${DEFAULT_WEBVIEW_PORT}/`;
-    if (!configuredUrl || isLocalhostUrl(devUrl)) {
-      const port = getServerPort(devUrl) || DEFAULT_WEBVIEW_PORT;
-      webviewServer.start(cwd, port);
-      void waitForServer(devUrl, 20, 500).then((ready) => {
-        if (ready) {
-          log("Webview server ready, refreshing panel.");
-          void refreshAppPanel();
-        }
-      });
-    } else {
-      log(`Webview server not started (using ${configuredUrl}).`);
+
+  if (context.extensionMode === vscode.ExtensionMode.Development && cwd) {
+    buildWatcher.start(cwd);
+  }
+  const devUrl = configuredUrl || `http://localhost:${DEFAULT_WEBVIEW_PORT}/`;
+  const isLocalDevUrl = isLocalhostUrl(devUrl);
+  const devPort = getServerPort(devUrl) || DEFAULT_WEBVIEW_PORT;
+  const wsBridgeToken = isLocalDevUrl ? getOrCreateWsBridgeToken(storage) : "";
+  const wsBridgeHost =
+    (process.env.ATLASSIAN_WS_BRIDGE_HOST ?? DEFAULT_WS_BRIDGE_HOST).trim() || DEFAULT_WS_BRIDGE_HOST;
+  const wsBridgePort = (() => {
+    const raw = (process.env.ATLASSIAN_WS_BRIDGE_PORT ?? "").trim();
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    if (Number.isFinite(parsed) && parsed > 0 && parsed < 65536) {
+      return parsed;
     }
+    return DEFAULT_WS_BRIDGE_PORT;
+  })();
+
+  // Start Vite dev server (needs source files on disk)
+  if (cwd && (!configuredUrl || isLocalhostUrl(devUrl))) {
+    const extraEnv: Record<string, string> = {};
+    if (isLocalDevUrl && wsBridgeToken) {
+      extraEnv.VITE_ATLASSIAN_WS_BRIDGE_TOKEN = wsBridgeToken;
+      // Pass the bridge URL into the browser dev server so clients can connect without manual config.
+      const urlHost = wsBridgeHost === "0.0.0.0" || wsBridgeHost === "::" ? "127.0.0.1" : wsBridgeHost;
+      extraEnv.VITE_ATLASSIAN_WS_BRIDGE_URL = `ws://${urlHost}:${wsBridgePort}`;
+    }
+    webviewServer.start(cwd, devPort, extraEnv);
+  }
+
+  // Start WS bridge for Chrome dev view (needs only RPC handlers, not source files)
+  if (isLocalDevUrl) {
+    const token = wsBridgeToken;
+    const wsBridgeOrigins = (process.env.ATLASSIAN_WS_BRIDGE_ORIGINS ?? "").trim();
+    const defaultOrigins = [`http://localhost:${devPort}`, `http://127.0.0.1:${devPort}`];
+    const allowedOrigins = wsBridgeOrigins
+      ? wsBridgeOrigins.split(",").map((o) => o.trim()).filter(Boolean)
+      : defaultOrigins;
+
+    log(`[ws-bridge] auth enabled: token=${token} (manual: http://localhost:${devPort}/?wsToken=...)`);
+
+    wsBridge = new WebviewWsBridge(handlers, {
+      host: wsBridgeHost,
+      port: wsBridgePort,
+      token,
+      allowedOrigins,
+    });
+    try {
+      wsBridge.start();
+    } catch (err) {
+      log(`[ws-bridge] failed to start: ${err instanceof Error ? err.message : err}`);
+    }
+    context.subscriptions.push(wsBridge);
+    viewProvider?.setIpcBroadcast(wsBridge);
+    void waitForServer(devUrl, 20, 500).then((ready) => {
+      if (ready) {
+        log("Webview server ready, refreshing panel.");
+        void refreshAppPanel();
+      }
+    });
+  } else if (configuredUrl) {
+    log(`Webview server not started (using ${configuredUrl}).`);
   }
 
   const reopenAfterRestart = storage.getGlobalState<boolean>(REOPEN_APP_AFTER_RESTART_KEY);
@@ -153,45 +234,42 @@ export function activate(context: vscode.ExtensionContext): void {
     webviewServer,
     buildWatcher,
     extensionInstaller,
-    vscode.commands.registerCommand("atlassian.refresh", () => {
-      log("Refresh command triggered");
+    registerLoggedCommand(VSCODE_COMMANDS.REFRESH, () => {
       provider.refresh();
     }),
-    vscode.commands.registerCommand("atlassian.openApp", async (route?: string) => {
-      log("Open App command triggered");
+    registerLoggedCommand(VSCODE_COMMANDS.OPEN_APP, async (route?: string) => {
       await showAppPanel();
       if (route) {
         navigateToRoute({ name: route });
       }
     }),
-    vscode.commands.registerCommand("atlassian.login", async () => {
-      log("Login command triggered");
+    registerLoggedCommand(VSCODE_COMMANDS.LOGIN, async () => {
       await showAppPanel();
       navigateToRoute({ name: "setup" });
     }),
-    vscode.commands.registerCommand("atlassian.logout", async () => {
+    registerLoggedCommand(VSCODE_COMMANDS.LOGOUT, async () => {
       await client.clearAuth();
       provider.refresh();
       vscode.window.showInformationMessage("Atlassian credentials cleared.");
     }),
-    vscode.commands.registerCommand("atlassian.runDevWebview", async () => {
+    registerLoggedCommand(VSCODE_COMMANDS.RUN_DEV_WEBVIEW, async () => {
       await handlers.runDevWebview();
     }),
-    vscode.commands.registerCommand("atlassian.restartExtensionHost", async () => {
+    registerLoggedCommand(VSCODE_COMMANDS.RESTART_EXTENSION_HOST, async () => {
       closeAppPanel();
       await storage.setGlobalState(REOPEN_APP_AFTER_RESTART_KEY, true);
       await vscode.commands.executeCommand("workbench.action.restartExtensionHost");
     }),
-    vscode.commands.registerCommand("atlassian.reloadWebviews", async () => {
+    registerLoggedCommand(VSCODE_COMMANDS.RELOAD_WEBVIEWS, async () => {
       await handlers.reloadWebviews();
     }),
-    vscode.commands.registerCommand("atlassian.syncEnvToSettings", async () => {
+    registerLoggedCommand(VSCODE_COMMANDS.SYNC_ENV_TO_SETTINGS, async () => {
       await handlers.syncEnvToSettings();
     }),
-    vscode.commands.registerCommand("atlassian.reinstallExtension", async () => {
+    registerLoggedCommand(VSCODE_COMMANDS.REINSTALL_EXTENSION, async () => {
       await handlers.reinstallExtension();
     }),
-    vscode.commands.registerCommand("atlassian.openIssue", async (issue) => {
+    registerLoggedCommand(VSCODE_COMMANDS.OPEN_ISSUE, async (issue) => {
       const key = issue?.key || issue?.issue?.key;
       if (!key) {
         return;
@@ -204,6 +282,18 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   // no-op (handled by context subscriptions)
+}
+
+function registerLoggedCommand<T extends (...args: any[]) => any>(
+  commandId: string,
+  handler: T,
+): vscode.Disposable {
+  return vscode.commands.registerCommand(commandId, async (...args: Parameters<T>) => {
+    const action = getActionByVscodeCommand(commandId);
+    const payload = formatLogPayload(args);
+    log(`[cmd] id=${commandId} action=${action.id} payload=${payload}`);
+    return handler(...args);
+  });
 }
 
 function registerTreeProvider(

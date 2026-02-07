@@ -1,12 +1,6 @@
-import { IPC_COMMANDS, IPC_EVENTS } from "../../shared/ipc-contract";
+import { IPC_COMMANDS, IPC_EVENTS, type IpcEnvelope, type IpcHandler, type IpcMessage } from "@shared/contracts";
 
-export type IpcEnvelope =
-  | { kind: "rpc"; payload: string }
-  | { kind: "event"; name: string; payload?: unknown }
-  | { kind: "command"; name: string; payload?: unknown };
-
-export type IpcMessage = { name: string; payload?: unknown };
-export type IpcHandler = (payload?: unknown) => void;
+export type { IpcEnvelope, IpcHandler, IpcMessage };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;

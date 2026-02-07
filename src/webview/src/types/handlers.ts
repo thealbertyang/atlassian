@@ -1,44 +1,7 @@
 import type { AutomationRun, AutomationsIndex } from "@shared/automations-contract";
 import type { DocContent, DocsIndex } from "@shared/docs-contract";
-
-export type ConfigSource =
-  | "env.local"
-  | "env"
-  | "process.env"
-  | "settings"
-  | "mixed"
-  | "none";
-
-export type WebviewState = {
-  baseUrl: string;
-  email: string;
-  apiTokenConfigured: boolean;
-  configSource: ConfigSource;
-  authType?: "apiToken" | "none";
-  hasStoredToken?: boolean;
-  devMode?: boolean;
-  extensionId?: string;
-  uriScheme?: string;
-  dev?: {
-    lastExtensionBuildAt: number | null;
-    lastWebviewRenderAt: number | null;
-  };
-};
-
-export type JiraIssueDetails = {
-  key: string;
-  summary: string;
-  status: string;
-  issueType: string;
-  project: string;
-  description?: string;
-  priority?: string;
-  assignee?: string;
-  reporter?: string;
-  created?: string;
-  updated?: string;
-  url?: string;
-};
+import type { JiraIssueSummary, JiraIssueDetails, WebviewState, TriageState } from "@shared/contracts";
+import type { UniversalConfig } from "@shared/universal";
 
 export type TextDocumentLike = {
   fileName?: string;
@@ -66,8 +29,10 @@ export type HandlersType = {
   onDidOpenTextDocument: (observer: ObservableHandler<TextDocumentLike>) => Promise<() => void>;
   getState: () => Promise<WebviewState>;
   getIssue: (key: string) => Promise<JiraIssueDetails | null>;
+  listIssues: () => Promise<JiraIssueSummary[]>;
   getDocsIndex: () => Promise<DocsIndex>;
   getDocContent: (id: string) => Promise<DocContent | null>;
+  openDocInEditor: (id: string) => Promise<boolean>;
   revealDocAsset: (baseId: string, href: string) => Promise<boolean>;
   saveApiToken: (baseUrl: string, email: string, apiToken: string) => Promise<void>;
   disconnect: () => Promise<void>;
@@ -78,6 +43,11 @@ export type HandlersType = {
   runDevWebview: () => Promise<void>;
   restartExtensionHost: () => Promise<void>;
   reloadWebviews: () => Promise<void>;
+  startDevTaskTerminal: () => Promise<void>;
   getAutomations: () => Promise<AutomationsIndex>;
   getAutomationRuns: (automationId: string) => Promise<AutomationRun[]>;
+  getUniversalConfig: () => Promise<UniversalConfig>;
+  getTriageState: () => Promise<TriageState>;
+  runTriage: () => Promise<TriageState>;
+  getFullConfig: () => Promise<Record<string, unknown>>;
 };

@@ -1,13 +1,13 @@
 import { Disposable, Webview } from "vscode";
-import { IPC_COMMANDS, IPC_EVENTS } from "../../shared/ipc-contract";
+import { IPC_COMMANDS, IPC_EVENTS, type IpcEnvelope, type IpcHandler, type IpcMessage } from "../../shared/contracts";
 
-export type IpcEnvelope =
-  | { kind: "rpc"; payload: string }
-  | { kind: "event"; name: string; payload?: unknown }
-  | { kind: "command"; name: string; payload?: unknown };
-
-export type IpcMessage = { name: string; payload?: unknown };
-export type IpcHandler = (payload?: unknown) => void;
+export type { IpcEnvelope, IpcHandler, IpcMessage };
+export type IpcLogFn = (
+  direction: "send" | "recv",
+  kind: "event" | "command",
+  name: string,
+  payload?: unknown,
+) => void;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -91,7 +91,7 @@ export class WebviewIpcHost {
   private readonly commandHandlers = new Map<string, Set<IpcHandler>>();
   private readonly disposables: Disposable[] = [];
 
-  constructor(private readonly webview: Webview) {}
+  constructor(private readonly webview: Webview, private readonly logger?: IpcLogFn) {}
 
   listen(): Disposable {
     const disposable = this.webview.onDidReceiveMessage((message) => this.handleMessage(message));
@@ -120,20 +120,24 @@ export class WebviewIpcHost {
   }
 
   sendEvent(name: string, payload?: unknown) {
+    this.logger?.("send", "event", name, payload);
     void this.webview.postMessage({ kind: "event", name, payload });
   }
 
   sendCommand(name: string, payload?: unknown) {
+    this.logger?.("send", "command", name, payload);
     void this.webview.postMessage({ kind: "command", name, payload });
   }
 
   private handleMessage(message: unknown) {
     const command = getIpcCommand(message);
     if (command) {
+      this.logger?.("recv", "command", command.name, command.payload);
       dispatch(this.commandHandlers, command.name, command.payload);
     }
     const event = getIpcEvent(message);
     if (event) {
+      this.logger?.("recv", "event", event.name, event.payload);
       dispatch(this.eventHandlers, event.name, event.payload);
     }
   }

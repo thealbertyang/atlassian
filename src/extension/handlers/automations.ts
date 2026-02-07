@@ -65,6 +65,19 @@ const parseSimpleToml = (content: string): Record<string, unknown> => {
   return result;
 };
 
+const ALL_WEEKDAYS = ["MO", "TU", "WE", "TH", "FR"];
+const ALL_DAYS_SET = new Set(["SU", "MO", "TU", "WE", "TH", "FR", "SA"]);
+const DAY_LABELS: Record<string, string> = {
+  MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun",
+};
+
+const formatTime12h = (hour: number): string => {
+  if (hour === 0) return "12am";
+  if (hour < 12) return `${hour}am`;
+  if (hour === 12) return "12pm";
+  return `${hour - 12}pm`;
+};
+
 const rruleToHuman = (rrule: string): string => {
   if (!rrule) return "Not scheduled";
 
@@ -76,25 +89,51 @@ const rruleToHuman = (rrule: string): string => {
 
   const freq = parts.FREQ;
   const interval = parseInt(parts.INTERVAL ?? "1", 10);
-  const byDay = parts.BYDAY;
-  const byHour = parts.BYHOUR;
-  const byMinute = parts.BYMINUTE;
+  const byDayRaw = parts.BYDAY?.split(",") ?? [];
+  const byHour = parts.BYHOUR ? parseInt(parts.BYHOUR, 10) : undefined;
+
+  const timeStr = byHour !== undefined ? ` at ${formatTime12h(byHour)}` : "";
+
+  // Classify day sets
+  const daySet = new Set(byDayRaw);
+  const isEveryDay = daySet.size >= 7 || (daySet.size > 0 && [...ALL_DAYS_SET].every((d) => daySet.has(d)));
+  const isWeekdays = ALL_WEEKDAYS.every((d) => daySet.has(d)) && !daySet.has("SA") && !daySet.has("SU");
+  const isWeekends = daySet.has("SA") && daySet.has("SU") && daySet.size === 2;
+
+  if (freq === "MINUTELY") {
+    return interval === 1 ? "Every minute" : `Every ${interval} min`;
+  }
 
   if (freq === "HOURLY") {
-    if (interval === 1) return "Every hour";
+    if (interval === 1) return "Hourly";
     if (interval === 24) return "Daily";
-    return `Every ${interval} hours`;
+    return `Every ${interval}h`;
   }
 
   if (freq === "DAILY") {
-    const time = byHour ? `at ${byHour}:${byMinute?.padStart(2, "0") ?? "00"}` : "";
-    return interval === 1 ? `Daily ${time}`.trim() : `Every ${interval} days ${time}`.trim();
+    const base = interval === 1 ? "Daily" : `Every ${interval} days`;
+    return `${base}${timeStr}`;
   }
 
   if (freq === "WEEKLY") {
-    const days = byDay ?? "daily";
-    const time = byHour ? `at ${byHour}:${byMinute?.padStart(2, "0") ?? "00"}` : "";
-    return `Weekly on ${days} ${time}`.trim();
+    if (isEveryDay) return `Daily${timeStr}`;
+    if (isWeekdays) return `Weekdays${timeStr}`;
+    if (isWeekends) return `Weekends${timeStr}`;
+    if (byDayRaw.length > 0) {
+      const dayNames = byDayRaw.map((d) => DAY_LABELS[d] ?? d).join(", ");
+      return `${dayNames}${timeStr}`;
+    }
+    const base = interval === 1 ? "Weekly" : `Every ${interval} weeks`;
+    return `${base}${timeStr}`;
+  }
+
+  if (freq === "MONTHLY") {
+    const base = interval === 1 ? "Monthly" : `Every ${interval} months`;
+    return `${base}${timeStr}`;
+  }
+
+  if (freq === "YEARLY") {
+    return interval === 1 ? "Yearly" : `Every ${interval} years`;
   }
 
   return rrule;
@@ -102,6 +141,7 @@ const rruleToHuman = (rrule: string): string => {
 
 const isDirectory = (p: string): boolean => {
   try {
+    // statSync follows symlinks, so symlinked dirs resolve correctly
     return fs.statSync(p).isDirectory();
   } catch {
     return false;
@@ -116,6 +156,51 @@ const isFile = (p: string): boolean => {
   }
 };
 
+const GLOBAL_SYMLINK_NAME = ".codex-global";
+
+/**
+ * Ensure a symlink exists at `_agents/automations/.codex-global` -> `~/.codex/automations/`.
+ * This lets VS Code file watchers on the workspace observe global automation changes.
+ */
+const ensureGlobalSymlink = (workspaceAgentsDir: string): string | null => {
+  const globalDir = path.join(CODEX_HOME, AUTOMATIONS_DIR);
+  if (!isDirectory(globalDir)) return null;
+
+  const agentsAutomationsDir = path.join(workspaceAgentsDir, AUTOMATIONS_DIR);
+
+  // Ensure _agents/automations/ exists
+  try {
+    fs.mkdirSync(agentsAutomationsDir, { recursive: true });
+  } catch {
+    return null;
+  }
+
+  const symlinkPath = path.join(agentsAutomationsDir, GLOBAL_SYMLINK_NAME);
+
+  try {
+    const existing = fs.lstatSync(symlinkPath);
+    if (existing.isSymbolicLink()) {
+      const target = fs.readlinkSync(symlinkPath);
+      if (target === globalDir) return symlinkPath; // Already correct
+      // Wrong target — remove and recreate
+      fs.unlinkSync(symlinkPath);
+    } else {
+      // Not a symlink (someone created a real dir) — don't touch it
+      return null;
+    }
+  } catch {
+    // Doesn't exist — create it
+  }
+
+  try {
+    fs.symlinkSync(globalDir, symlinkPath, "dir");
+    return symlinkPath;
+  } catch (err) {
+    console.warn("Failed to create global automations symlink:", err);
+    return null;
+  }
+};
+
 const loadAutomationsFromDir = (
   dir: string,
   source: AutomationSource,
@@ -127,7 +212,10 @@ const loadAutomationsFromDir = (
   const automations: Automation[] = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    if (entry.name.startsWith(".")) continue;
+    // Use statSync to follow symlinks — entry.isDirectory() doesn't follow them
+    const entryPath = path.join(dir, entry.name);
+    if (!isDirectory(entryPath)) continue;
 
     const automationDir = path.join(dir, entry.name);
     const tomlPath = path.join(automationDir, AUTOMATION_TOML);
@@ -227,21 +315,31 @@ const queryAutomationRuns = (automationId: string): AutomationRun[] => {
   }
 };
 
-export const createAutomationHandlers = ({ context }: AutomationsDependencies) => ({
+export const createAutomationHandlers = ({ context: _context }: AutomationsDependencies) => ({
   getAutomations: async (): Promise<AutomationsIndex> => {
     const timingMap = querySqliteTiming();
 
-    const globalDir = path.join(CODEX_HOME, AUTOMATIONS_DIR);
+    const workspaceFolder = workspace.workspaceFolders?.[0];
+    const agentsDir = workspaceFolder
+      ? path.join(workspaceFolder.uri.fsPath, "_agents")
+      : null;
+
+    // Ensure symlink: _agents/automations/.codex-global -> ~/.codex/automations/
+    // This lets VS Code file watchers observe global automation changes from the workspace.
+    let globalDir = path.join(CODEX_HOME, AUTOMATIONS_DIR);
+    if (agentsDir) {
+      const symlink = ensureGlobalSymlink(agentsDir);
+      if (symlink) {
+        // Read global automations via the symlink so watchers stay consistent
+        globalDir = symlink;
+      }
+    }
+
     const globalAutomations = loadAutomationsFromDir(globalDir, "global", timingMap);
 
     let workspaceAutomations: Automation[] = [];
-    const workspaceFolder = workspace.workspaceFolders?.[0];
-    if (workspaceFolder) {
-      const workspaceDir = path.join(
-        workspaceFolder.uri.fsPath,
-        "_agents",
-        AUTOMATIONS_DIR,
-      );
+    if (agentsDir) {
+      const workspaceDir = path.join(agentsDir, AUTOMATIONS_DIR);
       workspaceAutomations = loadAutomationsFromDir(workspaceDir, "workspace", timingMap);
     }
 

@@ -6,9 +6,11 @@ import { AbstractViewProvider } from "./view-provider-abstract";
 import { DEFAULT_WEBVIEW_PORT } from "../../constants";
 import { WebviewRenderTracker } from "../../service/webview-render-tracker";
 import type { WebviewRoute } from "../../service/webview-route";
-import { IPC_COMMANDS, IPC_EVENTS } from "../../../shared/ipc-contract";
-import { buildRouteHash, routeHintToPath } from "../../../shared/route-contract";
+import { IPC_COMMANDS, IPC_EVENTS } from "../../../shared/contracts";
+import type { RouteChangedPayload } from "../../../shared/contracts";
+import { buildRouteHash, routeHintToPath } from "../../../shared/contracts";
 import { WebviewIpcHost } from "../../service/webview-ipc";
+import { logIpcMessage } from "../../service/ui-logger";
 import { getWebviewServerUrl } from "../data/atlassian/atlassianConfig";
 import { log } from "../data/atlassian/logger";
 import { resolveWebviewPath, resolveWebviewRoot } from "../../webview/paths";
@@ -22,12 +24,20 @@ export class ViewProviderPanel extends AbstractViewProvider {
   static readonly viewType = "atlassianAppWebviewPanel";
   static readonly title = "Atlassian Sprint";
 
+  // Optional fan-out for browser dev mode (WS bridge) so VS Code-initiated
+  // navigation/state commands can reach external clients as well.
+  private ipcBroadcast?: {
+    sendCommand: (name: string, payload?: unknown) => void;
+    sendEvent: (name: string, payload?: unknown) => void;
+  };
+
   private readonly exposedWebviews = new WeakSet<Webview>();
   private readonly renderTracker?: WebviewRenderTracker;
   private pendingRoute?: WebviewRoute;
   private initialRoute?: WebviewRoute;
   private webviewReady = false;
   private ipc?: WebviewIpcHost;
+  private currentRoute?: RouteChangedPayload;
 
   constructor(
     context: ExtensionContext,
@@ -37,8 +47,18 @@ export class ViewProviderPanel extends AbstractViewProvider {
     super(context, handlers, {
       distDir: "out/webview",
       indexPath: "out/webview/index.html",
+      logContextProvider: () => this.getLogContext(),
     });
     this.renderTracker = renderTracker;
+  }
+
+  setIpcBroadcast(
+    broadcast?: {
+      sendCommand: (name: string, payload?: unknown) => void;
+      sendEvent: (name: string, payload?: unknown) => void;
+    } | null,
+  ) {
+    this.ipcBroadcast = broadcast ?? undefined;
   }
 
   async resolveWebviewView(webviewView: WebviewPanel) {
@@ -58,7 +78,12 @@ export class ViewProviderPanel extends AbstractViewProvider {
 
     this.exposeHandlersOnce(webview);
     this.ipc?.dispose();
-    this.ipc = new WebviewIpcHost(webview);
+    this.ipc = new WebviewIpcHost(webview, (direction, kind, name, payload) => {
+      if (direction === "recv" && kind === "event" && name === IPC_EVENTS.ROUTE_CHANGED) {
+        this.currentRoute = payload as RouteChangedPayload;
+      }
+      logIpcMessage(direction, kind, name, payload, this.getLogContext());
+    });
     this.ipc.listen();
     this.ipc.onCommand(IPC_COMMANDS.REFRESH_WEBVIEW, () => {
       void this.updateWebview(webviewView);
@@ -74,6 +99,26 @@ export class ViewProviderPanel extends AbstractViewProvider {
     });
     webview.html = await this.getWebviewHtmlSafe(webview);
     this.renderTracker?.markRendered();
+  }
+
+  private getLogContext(): string | undefined {
+    const parts: string[] = [`view=${ViewProviderPanel.viewType}`];
+    const route = this.formatRoute(this.currentRoute);
+    if (route) {
+      parts.push(`route=${route}`);
+    }
+    return parts.join(" ");
+  }
+
+  private formatRoute(route?: RouteChangedPayload): string | undefined {
+    if (!route?.path) {
+      return undefined;
+    }
+    if (!route.query || Object.keys(route.query).length === 0) {
+      return route.path;
+    }
+    const params = new URLSearchParams(route.query).toString();
+    return params ? `${route.path}?${params}` : route.path;
   }
 
   private getServerInfo(): { url: string; port: number; isLocal: boolean } {
@@ -92,9 +137,22 @@ export class ViewProviderPanel extends AbstractViewProvider {
     this.renderTracker?.markRendered();
   }
 
+  /**
+   * Requests navigation to a route. Sets both the pending IPC command and the
+   * initial-route injection so the route is applied regardless of webview lifecycle state:
+   *
+   * 1. If the webview is ready → sends IPC NAVIGATE immediately.
+   * 2. If the webview is loading → `pendingRoute` is sent when WEBVIEW_READY fires.
+   * 3. If HTML hasn't been built yet → `initialRoute` is embedded via {@link injectInitialRoute}.
+   *
+   * **Call this BEFORE `showApp()`** so that `injectInitialRoute` can embed the route
+   * in the HTML when the panel is first created.
+   */
   requestNavigate(route: WebviewRoute) {
     this.pendingRoute = route;
     this.initialRoute = route;
+    // External browser clients shouldn't wait for the VS Code webview lifecycle.
+    this.ipcBroadcast?.sendCommand(IPC_COMMANDS.NAVIGATE, { route });
     this.postPendingRoute();
   }
 
@@ -104,6 +162,11 @@ export class ViewProviderPanel extends AbstractViewProvider {
     }
     this.exposedWebviews.add(webview);
     this.exposeHandlers(webview);
+  }
+
+  sendCommand(name: string, payload?: unknown) {
+    this.ipcBroadcast?.sendCommand(name, payload);
+    if (this.webviewReady && this.ipc) this.ipc.sendCommand(name, payload);
   }
 
   private postPendingRoute() {
@@ -268,6 +331,16 @@ export class ViewProviderPanel extends AbstractViewProvider {
 </html>`;
   }
 
+  /**
+   * Embeds an initial route into the webview HTML so the app starts at the correct path.
+   *
+   * Sets both `location.hash` (so TanStack Router initializes at the right path) and
+   * `window.__atlassianRoute` (so App.tsx can apply the route hint in its mount effect).
+   *
+   * The hash is always overridden when an `initialRoute` is present — even if a previous
+   * hash exists (e.g., `#/plan` from a prior session). This is intentional: `initialRoute`
+   * represents an explicit navigation request (deep link, command) that should take priority.
+   */
   private injectInitialRoute(html: string): string {
     if (!this.initialRoute) {
       return html;
@@ -275,9 +348,10 @@ export class ViewProviderPanel extends AbstractViewProvider {
     const normalizedPath = routeHintToPath(this.initialRoute);
     const targetHash = buildRouteHash(normalizedPath, this.initialRoute.query);
     const routePayload = JSON.stringify(this.initialRoute);
-    const script = `<script>(function(){try{window.__atlassianRoute=${routePayload};if(!location.hash||location.hash===\"#/\"){location.hash=${JSON.stringify(
+    // Always override the hash — this route was explicitly requested via deep link or command.
+    const script = `<script>(function(){try{window.__atlassianRoute=${routePayload};location.hash=${JSON.stringify(
       targetHash,
-    )};}}catch(e){}})();</script>`;
+    )};}catch(e){}})();</script>`;
     this.initialRoute = undefined;
     return html.replace(/<head>/i, `<head>${script}`);
   }

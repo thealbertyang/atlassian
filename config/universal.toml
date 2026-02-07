@@ -1,0 +1,224 @@
+[app]
+id = "atlassian"
+name = "Atlassian Sprint"
+namespace = "atlassian"
+defaultRoute = "plan"
+intentScheme = "app"
+
+description = "Config-driven registry for actions, routes, commands, and UI."
+
+[namespaces]
+app = "atlassian"
+actions = "atlassian"
+commands = "atlassian"
+events = "atlassian"
+routes = "atlassian"
+settings = "atlassian"
+
+# --- Platforms / Environments ---
+
+[platforms.vscode]
+kind = "vscode"
+description = "VS Code webview panel"
+
+[platforms.web]
+kind = "web"
+description = "Browser via WS bridge (localhost dev)"
+
+[platforms.remote]
+kind = "remote"
+description = "VS Code Remote (SSH/WSL/Codespaces)"
+
+[environments.dev]
+kind = "dev"
+description = "Development mode"
+
+[environments.prod]
+kind = "prod"
+description = "Installed extension"
+
+[styles]
+theme = "gold"
+
+[styles.cssVariables]
+"--app-accent" = "#EAD872"
+"--app-muted" = "#5B4E2A"
+"--stage-rail-width" = "48px"
+"--stage-rail-active-border" = "var(--vscode-button-background)"
+
+# --- Stages ---
+
+[stages.plan]
+id = "plan"
+label = "Plan"
+icon = "calendar"
+order = 1
+defaultRoute = "/plan"
+
+[stages.plan.subnav]
+daily = { label = "Daily", path = "/plan", order = 1 }
+weekly = { label = "Weekly", path = "/plan/weekly", order = 2 }
+monthly = { label = "Monthly", path = "/plan/monthly", order = 3 }
+quarterly = { label = "Quarterly", path = "/plan/quarterly", order = 4 }
+career = { label = "Career", path = "/plan/career", order = 5 }
+
+[stages.execute]
+id = "execute"
+label = "Execute"
+icon = "play"
+order = 2
+defaultRoute = "/execute"
+
+[stages.execute.subnav]
+
+[stages.review]
+id = "review"
+label = "Review"
+icon = "eye"
+order = 3
+defaultRoute = "/review"
+
+[stages.ship]
+id = "ship"
+label = "Ship"
+icon = "rocket"
+order = 4
+defaultRoute = "/ship"
+
+[stages.observe]
+id = "observe"
+label = "Observe"
+icon = "pulse"
+order = 5
+defaultRoute = "/observe"
+
+[stages.system]
+id = "system"
+label = "System"
+icon = "gear"
+order = 99
+defaultRoute = "/system/settings"
+
+[stages.system.subnav]
+settings = { label = "Settings", path = "/system/settings", order = 1 }
+docs = { label = "Docs", path = "/system/docs", order = 2 }
+registry = { label = "Registry", path = "/system/registry", order = 3 }
+
+# --- Storage ---
+
+[storage.targets.settings]
+kind = "settings"
+scope = "workspace"
+
+[storage.targets.secrets]
+kind = "secrets"
+scope = "global"
+
+[storage.targets.globalState]
+kind = "state"
+scope = "global"
+
+[storage.targets.workspaceState]
+kind = "state"
+scope = "workspace"
+
+[storage.targets.workspaceFiles]
+kind = "file"
+scope = "workspace"
+
+[storage.targets.globalFiles]
+kind = "file"
+scope = "global"
+
+[storage.targets.webviewState]
+kind = "vscodeStorage"
+scope = "webview"
+
+[storage.targets.webviewLocal]
+kind = "localStorage"
+scope = "webview"
+
+[storage.targets.webviewIndexedDb]
+kind = "indexeddb"
+scope = "webview"
+
+[storage.targets.extensionSqlite]
+kind = "sqlite"
+scope = "workspace"
+
+[storage.targets.externalDatabase]
+kind = "remoteDb"
+scope = "global"
+
+# --- Views / Routes / Actions / Commands / Events ---
+
+[views.plan]
+label = "Daily Focus"
+route = "plan"
+
+[routes.plan]
+path = "/plan"
+view = "plan"
+
+[actions.appOpen]
+id = "atlassian.app.open"
+command = "atlassian.openApp"
+route = "plan"
+
+[commands.openApp]
+id = "atlassian.openApp"
+kind = "vscode"
+title = "Atlassian: Open App"
+
+[events.routeChanged]
+id = "atlassian.route.changed"
+kind = "ipc"
+
+# ── URL State Registry ──────────────────────────────────────
+# Declares every app-owned query parameter.
+# Used for: URL sanitization, omnibox hints, registry docs, validation.
+
+[urlState.view]
+type = "enum"
+values = ["compact", "expanded", "board", "list"]
+default = "compact"
+description = "Layout mode for the current page"
+history = "replace"
+
+[urlState.sort]
+type = "enum"
+values = ["priority", "updated", "created", "status"]
+default = "priority"
+description = "Sort order for list views"
+history = "replace"
+
+[urlState.filter]
+type = "string"
+description = "Active filter expression"
+history = "push"
+
+[urlState.open]
+type = "string"
+description = "Dot-separated list of open/expanded sections"
+history = "replace"
+
+[urlState.q]
+type = "string"
+description = "Search query text"
+history = "replace"
+
+[urlState.tab]
+type = "string"
+description = "Active tab identifier"
+history = "replace"
+
+[urlState.focus]
+type = "string"
+description = "Focused item identifier (for scroll-to/highlight)"
+history = "replace"
+
+[urlState.stage]
+type = "enum"
+values = ["plan", "execute", "review", "ship", "observe", "system"]
+description = "Active lifecycle stage override"
+history = "push"

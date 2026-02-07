@@ -7,6 +7,7 @@ export class ViewProviderSidebar extends AbstractViewProvider implements Webview
     super(context, handlers, {
       distDir: "out/webview",
       indexPath: "out/webview/index.html",
+      logContextProvider: () => "view=atlassianSidebar",
     });
   }
 

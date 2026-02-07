@@ -18,6 +18,11 @@ src/webview/.tanstack/**
 src/webview/Users/
 src/webview/Users/**
 
+# Workspace runtime state (machine-written)
+_agents/state.json
+_agents/app-global-state.json
+_agents/app-global-state.json.tmp
+
 # macOS
 .DS_Store
 

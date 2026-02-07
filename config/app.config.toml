@@ -1,0 +1,38 @@
+# App Engine Config (Developer-Facing)
+#
+# This file defines the deterministic app-model "engine" inputs/outputs:
+# - Which files in the workspace are considered user-facing configuration
+# - Where the extension writes the live, read-only app-global-state cache
+# - Which sources are merged to form the resolved Registry snapshot
+#
+# Users should not edit this file in normal usage. Prefer workspace overrides in:
+#   _agents/app.config.toml
+#
+# NOTE: This is intentionally a small, stable surface. The universal contract
+# (routes/actions/commands/events/etc) lives in `config/universal.toml`.
+
+version = 1
+
+[outputs]
+# Workspace-relative paths.
+userConfigPath = "_agents/app.config.toml"
+globalStatePath = "_agents/app-global-state.json"
+persistedStatePath = "_agents/state.json"
+
+[sources]
+# Where the universal registry contract is loaded from (workspace override takes priority).
+universalConfigPath = "config/universal.toml"
+
+[registry]
+includeUniversalConfig = true
+includeFullConfig = true
+includeWebviewState = true
+includePersistedState = true
+includeWorkspaceUserConfig = true
+
+[redaction]
+# mask | remove
+mode = "mask"
+# Case-insensitive substring matches. Used when writing app-global-state.json.
+keyPatterns = ["token", "secret", "password", "authorization"]
+

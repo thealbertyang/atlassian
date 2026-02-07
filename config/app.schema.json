@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Universal App Engine Config",
+  "description": "Developer-facing engine configuration that defines app model sources/outputs for deterministic generation and workspace caching.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "enum": [1],
+      "description": "Schema version for this engine config."
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "userConfigPath": {
+          "type": "string",
+          "description": "Workspace-relative path to the user-facing app config TOML."
+        },
+        "globalStatePath": {
+          "type": "string",
+          "description": "Workspace-relative path to the generated app-global-state JSON cache."
+        },
+        "persistedStatePath": {
+          "type": "string",
+          "description": "Workspace-relative path to the persisted runtime state JSON (machine-written)."
+        }
+      },
+      "required": ["userConfigPath", "globalStatePath", "persistedStatePath"]
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "universalConfigPath": {
+          "type": "string",
+          "description": "Path to the universal registry contract TOML (workspace override takes priority)."
+        }
+      },
+      "required": ["universalConfigPath"]
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "includeUniversalConfig": { "type": "boolean", "default": true },
+        "includeFullConfig": { "type": "boolean", "default": true },
+        "includeWebviewState": { "type": "boolean", "default": true },
+        "includePersistedState": { "type": "boolean", "default": true },
+        "includeWorkspaceUserConfig": { "type": "boolean", "default": true }
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["mask", "remove"],
+          "default": "mask",
+          "description": "How to handle secret-like fields when writing app-global-state.json."
+        },
+        "keyPatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["token", "secret", "password", "authorization"],
+          "description": "Case-insensitive substring patterns for keys to redact."
+        }
+      }
+    }
+  },
+  "required": ["version", "outputs", "sources"]
+}
+

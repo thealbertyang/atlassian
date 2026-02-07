@@ -11,7 +11,7 @@ export class WebviewServer implements vscode.Disposable {
   private lastCwd = "";
   private lastPort = 0;
 
-  start(cwd: string, port: number): void {
+  start(cwd: string, port: number, extraEnv: Record<string, string> = {}): void {
     if (this.isRunning()) {
       if (this.lastCwd === cwd && this.lastPort === port) {
         this.output.appendLine(`[devserver] already running (cwd=${cwd}, port=${port})`);
@@ -28,6 +28,7 @@ export class WebviewServer implements vscode.Disposable {
     const env = {
       ...process.env,
       ATLASSIAN_WEBVIEW_PORT: String(port),
+      ...extraEnv,
     };
 
     const child = spawnDevCommand(cwd, env);

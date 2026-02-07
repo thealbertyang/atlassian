@@ -3,7 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { getWebviewPath } from "../providers/data/atlassian/atlassianConfig";
 
-export function resolveWebviewPath(extensionPath: string): string {
+export function resolveWebviewPath(_extensionPath: string): string {
   const configured = getWebviewPath();
   if (configured) {
     return configured;

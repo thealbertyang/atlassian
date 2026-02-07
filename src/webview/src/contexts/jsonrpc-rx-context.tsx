@@ -9,7 +9,13 @@ type VsCodeApi = {
 };
 
 const isBrowser = typeof window !== "undefined";
-const isWebview = isBrowser && typeof (window as any).acquireVsCodeApi === "function";
+export const isWebview = isBrowser && typeof (window as any).acquireVsCodeApi === "function";
+
+const DEFAULT_WS_BRIDGE_URL = "ws://localhost:5174";
+const WS_BRIDGE_TOKEN_PARAM = "wsToken";
+const WS_BRIDGE_TOKEN_STORAGE_KEY = "atlassian.wsBridgeToken";
+
+let bridgeReady = false;
 
 const fallbackApi: VsCodeApi = {
   postMessage: (message: unknown) => console.debug("[webview] postMessage", message),
@@ -17,18 +23,143 @@ const fallbackApi: VsCodeApi = {
   setState: (state: unknown) => state,
 };
 
-export const getVsCodeApi = (): VsCodeApi => {
-  if (!isWebview) {
-    return fallbackApi;
+const readWsBridgeToken = (): string | undefined => {
+  // 1) Prefer build-time env (useful for CI/dev scripts).
+  const envToken = (import.meta as any)?.env?.VITE_ATLASSIAN_WS_BRIDGE_TOKEN;
+  if (typeof envToken === "string" && envToken.trim()) {
+    return envToken.trim();
   }
-  const existing = (window as any).__vscodeApi as VsCodeApi | undefined;
-  if (existing) {
-    return existing;
+
+  // 2) Allow setting the token once via URL query: http://localhost:5173/?wsToken=...
+  // This is outside the hash router, so it won't interfere with TanStack's hash history.
+  try {
+    const url = new URL(window.location.href);
+    const fromUrl = url.searchParams.get(WS_BRIDGE_TOKEN_PARAM);
+    if (fromUrl && fromUrl.trim()) {
+      const trimmed = fromUrl.trim();
+      localStorage.setItem(WS_BRIDGE_TOKEN_STORAGE_KEY, trimmed);
+      url.searchParams.delete(WS_BRIDGE_TOKEN_PARAM);
+      window.history.replaceState(null, "", url.toString());
+      return trimmed;
+    }
+  } catch {
+    // ignore
   }
-  const api = (window as any).acquireVsCodeApi() as VsCodeApi;
-  (window as any).__vscodeApi = api;
-  return api;
+
+  // 3) Fall back to persisted localStorage.
+  try {
+    const stored = localStorage.getItem(WS_BRIDGE_TOKEN_STORAGE_KEY);
+    return stored && stored.trim() ? stored.trim() : undefined;
+  } catch {
+    return undefined;
+  }
 };
+
+const readWsBridgeUrl = (): string => {
+  const fromEnv = (import.meta as any)?.env?.VITE_ATLASSIAN_WS_BRIDGE_URL;
+  if (typeof fromEnv === "string" && fromEnv.trim()) {
+    return fromEnv.trim();
+  }
+  return DEFAULT_WS_BRIDGE_URL;
+};
+
+const buildWsBridgeUrl = (): string => {
+  const base = readWsBridgeUrl();
+  const token = readWsBridgeToken();
+  if (!token) {
+    return base;
+  }
+  const url = new URL(base);
+  url.searchParams.set("token", token);
+  return url.toString();
+};
+
+const createWsBridge = (): VsCodeApi | null => {
+  try {
+    const pending: string[] = [];
+    let ws: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+
+    const connect = () => {
+      if (reconnectTimer) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+
+      try {
+        ws = new WebSocket(buildWsBridgeUrl());
+      } catch {
+        ws = null;
+        reconnectTimer = window.setTimeout(connect, 2000);
+        return;
+      }
+
+      ws.onopen = () => {
+        bridgeReady = true;
+        for (const msg of pending.splice(0)) {
+          ws?.send(msg);
+        }
+        window.dispatchEvent(new CustomEvent("ws-bridge-connected"));
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        window.dispatchEvent(new MessageEvent("message", { data }));
+      };
+
+      ws.onclose = (event) => {
+        bridgeReady = false;
+        ws = null;
+        if (event.code === 1008) {
+          window.dispatchEvent(new CustomEvent("ws-bridge-auth-failed"));
+          return;
+        }
+        reconnectTimer = window.setTimeout(connect, 2000);
+      };
+    };
+
+    connect();
+
+    return {
+      postMessage: (message: unknown) => {
+        const serialized = JSON.stringify(message);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(serialized);
+        } else {
+          pending.push(serialized);
+        }
+      },
+      getState: () => {
+        try { return JSON.parse(localStorage.getItem("vscode-state") ?? "null"); }
+        catch { return undefined; }
+      },
+      setState: (state: unknown) => {
+        localStorage.setItem("vscode-state", JSON.stringify(state));
+        return state;
+      },
+    };
+  } catch {
+    return null;
+  }
+};
+
+let wsApi: VsCodeApi | null = null;
+
+export const getVsCodeApi = (): VsCodeApi => {
+  if (isWebview) {
+    const existing = (window as any).__vscodeApi as VsCodeApi | undefined;
+    if (existing) return existing;
+    const api = (window as any).acquireVsCodeApi() as VsCodeApi;
+    (window as any).__vscodeApi = api;
+    return api;
+  }
+  if (!wsApi) {
+    wsApi = createWsBridge();
+  }
+  return wsApi ?? fallbackApi;
+};
+
+export const isBridgeConnected = () => bridgeReady;
 
 const noopSender: MessageSender = () => undefined;
 const noopReceiver: MessageReceiver = () => undefined;

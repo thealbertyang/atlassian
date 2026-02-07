@@ -80,10 +80,10 @@ export class AtlassianClient {
     await this.storage.deleteSecret(STORAGE_KEYS.apiToken);
   }
 
-  async getIssueUrl(key: string): Promise<string | null> {
+  async getIssueUrl(key: string): Promise<string | undefined> {
     const auth = await this.getAuth();
     if (!auth) {
-      return null;
+      return undefined;
     }
     const baseUrl = auth.baseUrl;
     return `${baseUrl.replace(/\/$/, "")}/browse/${encodeURIComponent(key)}`;

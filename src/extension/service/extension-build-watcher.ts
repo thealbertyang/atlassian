@@ -1,4 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
+import { statSync } from "fs";
+import { join } from "path";
 import * as vscode from "vscode";
 
 const BUILD_COMMAND = "bun run build:ext";
@@ -12,6 +14,8 @@ export class ExtensionBuildWatcher implements vscode.Disposable {
   private output = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
   private lastCwd = "";
   private lastBuildAt: number | null = null;
+  private readonly _onDidBuild = new vscode.EventEmitter<number>();
+  readonly onDidBuild = this._onDidBuild.event;
 
   start(cwd: string): void {
     if (this.isRunning()) {
@@ -36,7 +40,7 @@ export class ExtensionBuildWatcher implements vscode.Disposable {
         }`,
       );
       if (code === 0) {
-        this.lastBuildAt = Date.now();
+        this.setBuildAt(Date.now());
       }
       this.buildProcess = undefined;
       this.startWatch(cwd);
@@ -46,6 +50,28 @@ export class ExtensionBuildWatcher implements vscode.Disposable {
       this.buildProcess = undefined;
       this.startWatch(cwd);
     });
+  }
+
+  private setBuildAt(timestamp: number): void {
+    this.lastBuildAt = timestamp;
+    this._onDidBuild.fire(timestamp);
+  }
+
+  seedFromDisk(extensionPath: string): void {
+    if (this.lastBuildAt !== null) {
+      return;
+    }
+    try {
+      const outFile = join(extensionPath, "out", "extension", "extension.js");
+      const stat = statSync(outFile);
+      this.lastBuildAt = stat.mtimeMs;
+    } catch {
+      // output file doesn't exist yet
+    }
+  }
+
+  markBuild(): void {
+    this.setBuildAt(Date.now());
   }
 
   getLastBuildAt(): number | null {
@@ -86,6 +112,7 @@ export class ExtensionBuildWatcher implements vscode.Disposable {
 
   dispose(): void {
     this.stop("dispose");
+    this._onDidBuild.dispose();
     this.output.dispose();
   }
 
@@ -96,7 +123,7 @@ export class ExtensionBuildWatcher implements vscode.Disposable {
       const text = data.toString();
       this.output.append(text);
       if (/\bBundled\b/i.test(text) || /\bbuild finished\b/i.test(text)) {
-        this.lastBuildAt = Date.now();
+        this.setBuildAt(Date.now());
       }
     });
     child.stderr.on("data", (data) => this.output.append(data.toString()));

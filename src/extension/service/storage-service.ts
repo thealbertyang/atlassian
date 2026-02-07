@@ -9,6 +9,11 @@ export class StorageService {
 
   getSetting<T>(key: string, fallback?: T, scope?: Uri): T | undefined {
     const config = workspace.getConfiguration(this.section, scope);
+    // VS Code config has overloads: `get(key)` or `get(key, defaultValue)`.
+    // Passing `undefined` as the defaultValue breaks overload resolution in TS.
+    if (fallback === undefined) {
+      return config.get<T>(key);
+    }
     return config.get<T>(key, fallback);
   }
 
@@ -23,6 +28,10 @@ export class StorageService {
   }
 
   getGlobalState<T>(key: string, fallback?: T): T | undefined {
+    // Same overload pattern as workspace config: avoid passing `undefined`.
+    if (fallback === undefined) {
+      return this.context.globalState.get<T>(key);
+    }
     return this.context.globalState.get<T>(key, fallback);
   }
 
@@ -31,6 +40,9 @@ export class StorageService {
   }
 
   getWorkspaceState<T>(key: string, fallback?: T): T | undefined {
+    if (fallback === undefined) {
+      return this.context.workspaceState.get<T>(key);
+    }
     return this.context.workspaceState.get<T>(key, fallback);
   }
 

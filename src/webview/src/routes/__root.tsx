@@ -1,11 +1,14 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { NuqsAdapter } from "nuqs/adapters/tanstack-router";
 import App from "../App";
 
 export const Route = createRootRoute({
   component: () => (
-    <App>
-      <Outlet />
-    </App>
+    <NuqsAdapter>
+      <App>
+        <Outlet />
+      </App>
+    </NuqsAdapter>
   ),
   notFoundComponent: () => (
     <div className="card">

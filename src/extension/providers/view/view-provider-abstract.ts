@@ -4,10 +4,12 @@ import { join } from "path";
 import { parse as htmlParser } from "node-html-parser";
 import { HandlerConfig, JsonrpcServer, expose } from "@jsonrpc-rx/server";
 import { getRpcPayload } from "../../service/webview-ipc";
+import { logRpcMessage } from "../../service/ui-logger";
 
 export type ViewProviderOptions = {
   distDir: string;
   indexPath: string;
+  logContextProvider?: () => string | undefined;
 };
 
 export abstract class AbstractViewProvider {
@@ -38,12 +40,16 @@ export abstract class AbstractViewProvider {
    * @param webview Webview instance
    */
   protected exposeHandlers(webview: Webview) {
-    const msgSender = (message: string) =>
-      webview.postMessage({ kind: "rpc", payload: message });
+    const getLogContext = () => this.wiewProviderOptions.logContextProvider?.();
+    const msgSender = (message: string) => {
+      logRpcMessage("send", message, getLogContext());
+      return webview.postMessage({ kind: "rpc", payload: message });
+    };
     const msgReceiver = (handler: (message: string) => void) =>
       webview.onDidReceiveMessage((message) => {
         const payload = getRpcPayload(message);
         if (payload) {
+          logRpcMessage("recv", payload, getLogContext());
           handler(payload);
         }
       });

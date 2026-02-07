@@ -48,11 +48,13 @@
 	"dependencies": {
 		"@jsonrpc-rx/server": "^0.2.1",
 		"axios": "^1.6.7",
-		"node-html-parser": "^7.0.1"
+		"node-html-parser": "^7.0.1",
+		"ws": "^8.19.0"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
 		"@types/vscode": "^1.86.0",
+		"@types/ws": "^8.18.1",
 		"@typescript/native-preview": "^7.0.0-dev.20260203.1",
 		"@vscode/vsce": "^3.6.2",
 		"oxfmt": "^0.28.0",
@@ -68,11 +70,11 @@
 				"title": "Atlassian: Login",
 				"icon": "$(settings-gear)"
 			},
-		{
-			"command": "atlassian.openApp",
-			"title": "Atlassian: Open App",
-			"icon": "$(screen-full)"
-		},
+			{
+				"command": "atlassian.openApp",
+				"title": "Atlassian: Open App",
+				"icon": "$(screen-full)"
+			},
 			{
 				"command": "atlassian.runDevWebview",
 				"title": "Atlassian: Run Webview Dev Server"
@@ -101,11 +103,11 @@
 				"command": "atlassian.refresh",
 				"title": "Atlassian: Refresh Issues"
 			},
-		{
-			"command": "atlassian.openIssue",
-			"title": "Atlassian: Open Issue",
-			"icon": "$(go-to-file)"
-		}
+			{
+				"command": "atlassian.openIssue",
+				"title": "Atlassian: Open Issue",
+				"icon": "$(go-to-file)"
+			}
 		],
 		"views": {
 			"explorer": [

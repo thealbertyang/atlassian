@@ -1,6 +1,8 @@
 import { createContext, useContext } from "react";
 import type { ChangeEvent } from "react";
 import type { JiraIssueDetails, WebviewState } from "../types/handlers";
+import type { JiraIssueSummary } from "@shared/contracts";
+import type { UniversalConfig } from "@shared/universal";
 
 export type FormState = {
   baseUrl: string;
@@ -32,7 +34,12 @@ export type AppContextValue = {
   reloadWebviews: () => Promise<void>;
   reinstallExtension: () => Promise<void>;
   restartExtensionHost: () => Promise<void>;
+  startDevTaskTerminal: () => Promise<void>;
+  buildExtension: () => Promise<void>;
+  buildWebview: () => Promise<void>;
   formatTimestamp: (value: number | null | undefined) => string;
+  sprintIssues: JiraIssueSummary[];
+  sprintIssuesLoading: boolean;
   issue: JiraIssueDetails | null;
   issueLoading: boolean;
   issueError: string;
@@ -43,6 +50,8 @@ export type AppContextValue = {
   refreshIssue: () => void;
   navigate: (path: string) => void;
   routeName: string;
+  currentStage: string;
+  universalConfig: UniversalConfig | null;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);

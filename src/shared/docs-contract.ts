@@ -1,6 +1,6 @@
 export type DocsSource = "settings" | "extension" | "workspace" | "none";
 
-export type DocGroup = "docs" | "runbooks";
+export type DocGroup = "docs" | "runbooks" | "plans" | "skills";
 
 export type DocEntry = {
   id: string;

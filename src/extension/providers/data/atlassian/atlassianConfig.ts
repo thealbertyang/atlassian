@@ -2,6 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { MASKED_SECRET } from "../../../constants";
+import {
+  SETTINGS_KEYS,
+  SETTINGS_SECTION,
+  type ConfigSource,
+} from "../../../../shared/contracts";
 
 export interface ApiTokenConfig {
   baseUrl: string;
@@ -10,58 +15,73 @@ export interface ApiTokenConfig {
   jql: string;
 }
 
-export type ConfigSource = "env.local" | "env" | "process.env" | "settings" | "mixed" | "none";
 
-const BASE_URL_KEYS = ["JIRA_URL", "ATLASSIAN_BASE_URL"];
-const EMAIL_KEYS = ["JIRA_USER_EMAIL", "ATLASSIAN_EMAIL"];
-const TOKEN_KEYS = ["JIRA_API_TOKEN", "ATLASSIAN_API_TOKEN"];
+// Prefer the extension-scoped ATLASSIAN_* vars; keep JIRA_* as compatibility aliases.
+const BASE_URL_KEYS = ["ATLASSIAN_BASE_URL", "JIRA_URL"];
+const EMAIL_KEYS = ["ATLASSIAN_EMAIL", "JIRA_USER_EMAIL"];
+const TOKEN_KEYS = ["ATLASSIAN_API_TOKEN", "JIRA_API_TOKEN"];
 
 const isMaskedSecret = (value: string) => value.trim() === MASKED_SECRET;
 const stripMaskedSecret = (value: string) => (isMaskedSecret(value) ? "" : value);
 
 export function getWebviewServerUrl(): string {
-  const config = vscode.workspace.getConfiguration("atlassian");
+  const config = vscode.workspace.getConfiguration(SETTINGS_SECTION);
   const env = getEnvMap();
-  const fromConfig = resolveEnvPlaceholders(String(config.get("webviewServerUrl") || ""), env);
+  const fromConfig = resolveEnvPlaceholders(
+    String(config.get(SETTINGS_KEYS.WEBVIEW_SERVER_URL) || ""),
+    env,
+  );
   const fromEnv = getEnvValue(env, "ATLASSIAN_WEBVIEW_SERVER_URL");
   return (fromConfig || fromEnv).trim();
 }
 
 export function getWebviewPath(): string {
-  const config = vscode.workspace.getConfiguration("atlassian");
+  const config = vscode.workspace.getConfiguration(SETTINGS_SECTION);
   const env = getEnvMap();
-  const fromConfig = resolveEnvPlaceholders(String(config.get("webviewPath") || ""), env);
+  const fromConfig = resolveEnvPlaceholders(
+    String(config.get(SETTINGS_KEYS.WEBVIEW_PATH) || ""),
+    env,
+  );
   const fromEnv = getEnvValue(env, "ATLASSIAN_WEBVIEW_PATH");
   return (fromConfig || fromEnv).trim();
 }
 
 export function getDocsPath(): string {
-  const config = vscode.workspace.getConfiguration("atlassian");
+  const config = vscode.workspace.getConfiguration(SETTINGS_SECTION);
   const env = getEnvMap();
-  const fromConfig = resolveEnvPlaceholders(String(config.get("docsPath") || ""), env);
+  const fromConfig = resolveEnvPlaceholders(
+    String(config.get(SETTINGS_KEYS.DOCS_PATH) || ""),
+    env,
+  );
   const fromEnv = getEnvValue(env, "ATLASSIAN_DOCS_PATH");
   return (fromConfig || fromEnv).trim();
 }
 
 export function getApiTokenConfig(): ApiTokenConfig {
-  const config = vscode.workspace.getConfiguration("atlassian");
+  const config = vscode.workspace.getConfiguration(SETTINGS_SECTION);
   const env = getEnvMap();
 
   const baseUrl =
-    getEnvValue(env, "JIRA_URL") ||
     getEnvValue(env, "ATLASSIAN_BASE_URL") ||
-    resolveEnvPlaceholders(String(config.get("baseUrl") || config.get("jiraUrl") || ""), env);
+    getEnvValue(env, "JIRA_URL") ||
+    resolveEnvPlaceholders(
+      String(
+        config.get(SETTINGS_KEYS.BASE_URL) || config.get(SETTINGS_KEYS.JIRA_URL) || "",
+      ),
+      env,
+    );
   const email =
-    getEnvValue(env, "JIRA_USER_EMAIL") ||
     getEnvValue(env, "ATLASSIAN_EMAIL") ||
-    resolveEnvPlaceholders(String(config.get("email") || ""), env);
+    getEnvValue(env, "JIRA_USER_EMAIL") ||
+    resolveEnvPlaceholders(String(config.get(SETTINGS_KEYS.EMAIL) || ""), env);
   const apiToken = stripMaskedSecret(
-    getEnvValue(env, "JIRA_API_TOKEN") ||
-      getEnvValue(env, "ATLASSIAN_API_TOKEN") ||
-      resolveEnvPlaceholders(String(config.get("apiToken") || ""), env),
+    getEnvValue(env, "ATLASSIAN_API_TOKEN") ||
+      getEnvValue(env, "JIRA_API_TOKEN") ||
+      resolveEnvPlaceholders(String(config.get(SETTINGS_KEYS.API_TOKEN) || ""), env),
   );
   const jql =
-    getEnvValue(env, "JIRA_JQL") || resolveEnvPlaceholders(String(config.get("jql") || ""), env);
+    getEnvValue(env, "JIRA_JQL") ||
+    resolveEnvPlaceholders(String(config.get(SETTINGS_KEYS.JQL) || ""), env);
 
   return {
     baseUrl: baseUrl.trim(),
@@ -72,7 +92,7 @@ export function getApiTokenConfig(): ApiTokenConfig {
 }
 
 export function getApiTokenConfigSource(): ConfigSource {
-  const config = vscode.workspace.getConfiguration("atlassian");
+  const config = vscode.workspace.getConfiguration(SETTINGS_SECTION);
   const folders = vscode.workspace.workspaceFolders ?? [];
   const envMap = getEnvMap();
 
@@ -123,7 +143,9 @@ export function getApiTokenConfigSource(): ConfigSource {
 
   if (!values.baseUrl) {
     const fromConfig = resolveEnvPlaceholders(
-      String(config.get("baseUrl") || config.get("jiraUrl") || ""),
+      String(
+        config.get(SETTINGS_KEYS.BASE_URL) || config.get(SETTINGS_KEYS.JIRA_URL) || "",
+      ),
       envMap,
     ).trim();
     if (fromConfig) {
@@ -132,7 +154,10 @@ export function getApiTokenConfigSource(): ConfigSource {
     }
   }
   if (!values.email) {
-    const fromConfig = resolveEnvPlaceholders(String(config.get("email") || ""), envMap).trim();
+    const fromConfig = resolveEnvPlaceholders(
+      String(config.get(SETTINGS_KEYS.EMAIL) || ""),
+      envMap,
+    ).trim();
     if (fromConfig) {
       values.email = fromConfig;
       sources.email = "settings";
@@ -140,7 +165,7 @@ export function getApiTokenConfigSource(): ConfigSource {
   }
   if (!values.apiToken) {
     const fromConfigRaw = resolveEnvPlaceholders(
-      String(config.get("apiToken") || ""),
+      String(config.get(SETTINGS_KEYS.API_TOKEN) || ""),
       envMap,
     ).trim();
     if (fromConfigRaw) {
